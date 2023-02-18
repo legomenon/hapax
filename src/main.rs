@@ -1,12 +1,20 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, BufWriter, Write};
 use std::path::Path;
 
+#[derive(Debug)]
+struct Stats {
+    stats: HashMap<String, usize>,
+    file: String,
+}
+
 fn main() {
-    let words = find_words("ga.srt");
-    let stats = words_stats(&words);
-    dbg!(stats);
+    let file = "data";
+    let words = find_words(file);
+    let st = get_stats(&words, file);
+    write_stats(&st);
+    dbg!(st);
 }
 
 fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>> {
@@ -15,7 +23,7 @@ fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader
 }
 
 fn find_words(file: &str) -> Vec<String> {
-    let re = regex::Regex::new("(?:[A-Za-z]+’?-?'?[A-Za-z]+)|(?:[A-Za-z]+)").unwrap();
+    let re = regex::Regex::new(r#"\b[\p{L}’'-]{2,}\b"#).unwrap();
     let lines = read_lines(file).unwrap();
 
     lines
@@ -34,7 +42,7 @@ fn find_words(file: &str) -> Vec<String> {
         .collect()
 }
 
-fn words_stats(words: &Vec<String>) -> HashMap<String, usize> {
+fn get_stats(words: &Vec<String>, file: &str) -> Stats {
     let mut stats: HashMap<String, usize> = HashMap::new();
     words.into_iter().for_each(|w| {
         stats
@@ -42,5 +50,24 @@ fn words_stats(words: &Vec<String>) -> HashMap<String, usize> {
             .and_modify(|counter| *counter += 1)
             .or_insert(1);
     });
-    stats
+
+    Stats {
+        stats,
+        file: file.to_owned(),
+    }
+}
+
+fn write_stats(s: &Stats) {
+    let file_name = s.file.to_owned() + ".stats";
+    let file = File::create(file_name).unwrap();
+    let mut vec: Vec<(&String, &usize)> = s.stats.iter().collect();
+    vec.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let mut file = BufWriter::new(file);
+
+    let s = vec
+        .iter()
+        .map(|(key, value)| format!("{:<20} {}\n", key, *value))
+        .collect::<String>();
+    file.write_all(s.as_bytes()).unwrap();
 }
