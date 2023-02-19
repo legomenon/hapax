@@ -1,5 +1,0 @@
-hello                3
-hello-hello          1
-n                    1
-word                 1
-he'llo               1

@@ -5,17 +5,16 @@ use std::path::Path;
 
 #[derive(Debug)]
 struct Stats {
-    term_frequency: HashMap<String, usize>,
+    term_frequency: HashMap<String, (usize, f64)>,
     file: String,
     length: usize,
 }
 
 fn main() {
-    let file = "ga.srt";
+    let file = "ga.sr";
     let words = find_words(file);
     let st = get_stats(&words, file);
     write_stats(&st);
-    // dbg!(st);
 }
 
 fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>> {
@@ -44,13 +43,19 @@ fn find_words(file: &str) -> Vec<String> {
 }
 
 fn get_stats(words: &Vec<String>, file: &str) -> Stats {
-    let mut stats: HashMap<String, usize> = HashMap::new();
+    let mut stats: HashMap<String, (usize, f64)> = HashMap::new();
     let len = words.len();
+
     words.into_iter().for_each(|w| {
         stats
             .entry(w.clone())
-            .and_modify(|counter| *counter += 1)
-            .or_insert(1);
+            .and_modify(|counter| counter.0 += 1)
+            .or_insert((1, 0.0));
+    });
+
+    stats.iter_mut().for_each(|(_, v)| {
+        let per = v.0 as f64 * 100.0 / len as f64;
+        v.1 = per;
     });
 
     Stats {
@@ -63,25 +68,27 @@ fn get_stats(words: &Vec<String>, file: &str) -> Stats {
 fn write_stats(s: &Stats) {
     let file_name = s.file.to_owned() + ".stats";
     let file = File::create(file_name).unwrap();
-    let mut vec: Vec<(&String, &usize)> = s.term_frequency.iter().collect();
-    vec.sort_by(|a, b| b.1.cmp(&a.1));
-
     let mut file = BufWriter::new(file);
+
+    let mut v: Vec<(&String, &(usize, f64))> = s.term_frequency.iter().collect();
+    v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+
     let head = format!(
-        "{:<22} {:<22}{}\n{}\n",
+        "FILE: {:<16} LENGTH: {}\n\n{:<22} {:<22}{}\n{}\n",
+        s.file,
+        s.length,
         "WORD:",
         "FREQUENCY:",
         "PERCENT:",
         "-".repeat(53)
     );
+
     file.write(head.as_bytes()).unwrap();
 
-    let s = vec
-        .iter()
-        .map(|(key, value)| {
-            let per = **value as f64 * 100.0 / s.length as f64;
-            format!("{:<22} {:<22} {:.2}%\n", key, *value, per)
-        })
+    let s = v
+        .into_iter()
+        .map(|(key, val)| format!("{:<22} {:<22} {:.2}%\n", key, val.0, val.1))
         .collect::<String>();
+
     file.write_all(s.as_bytes()).unwrap();
 }
