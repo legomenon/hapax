@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, BufRead, BufWriter, Write};
 use std::path::Path;
 
@@ -11,10 +11,11 @@ struct Stats {
 }
 
 fn main() {
-    let file = "ga.sr";
-    let words = find_words(file);
-    let st = get_stats(&words, file);
-    write_stats(&st);
+    // let file = "ga.srt";
+    // let words = find_words_in_file(file);
+    // let st = get_stats(&words, file);
+    // write_stats(&st);
+    find_words_in_dir("./files/")
 }
 
 fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>> {
@@ -22,7 +23,24 @@ fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader
     Ok(io::BufReader::new(file).lines())
 }
 
-fn find_words(file: &str) -> Vec<String> {
+fn find_words_in_dir<P: AsRef<Path>>(dir: P) {
+    let entries = fs::read_dir(dir).unwrap();
+    for entry in entries {
+        if let Ok(entry) = entry {
+            if let Some(file_name) = entry.file_name().to_str() {
+                if entry.file_type().map_or(false, |t| t.is_file()) {
+                    println!("{}", file_name);
+                    let path = entry.path().display().to_string();
+                    let words = find_words_in_file(&path);
+                    let st = get_stats(&words, file_name);
+                    write_stats(&st, &path);
+                }
+            }
+        }
+    }
+}
+
+fn find_words_in_file(file: &str) -> Vec<String> {
     let re = regex::Regex::new(r#"\b[\p{L}’'-]+\b"#).unwrap();
     let lines = read_lines(file).unwrap();
 
@@ -65,8 +83,16 @@ fn get_stats(words: &Vec<String>, file: &str) -> Stats {
     }
 }
 
-fn write_stats(s: &Stats) {
-    let file_name = s.file.to_owned() + ".stats";
+fn write_stats(s: &Stats, path: &str) {
+    let file_name = &s.file;
+    let dir = path.replace(file_name, "") + "result";
+    let path = std::path::Path::new(&dir);
+    
+    if !path.exists() {
+        fs::create_dir(&dir).unwrap();
+    }
+    let file_name = dir + "/" + &s.file;
+
     let file = File::create(file_name).unwrap();
     let mut file = BufWriter::new(file);
 
