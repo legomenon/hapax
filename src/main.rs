@@ -9,7 +9,7 @@ use std::str::FromStr;
 
 #[derive(Serialize, Debug)]
 struct Stats {
-    file: String,
+    file_name: String,
     // file_path: PathBuf,
     length: usize,
     term_frequency: HashMap<String, (usize, f64)>,
@@ -18,14 +18,14 @@ struct Stats {
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// type of the output file
+    /// type of the output file: json/csv/text
     #[clap(default_value = "json")]
     #[arg(short, long)]
-    output: Option<String>,
+    output: String,
     /// path to the output folder
     #[clap(default_value = "./")]
     #[arg(short, long)]
-    path: Option<String>,
+    path: String,
 
     #[command(subcommand)]
     command: Commands,
@@ -47,6 +47,7 @@ enum Commands {
 enum Output {
     Json,
     Text,
+    Csv,
 }
 
 fn main() {
@@ -58,13 +59,13 @@ fn main() {
                 let words = find_words_in_file(&f);
                 let f = PathBuf::from(f);
                 let st = Stats::build(&words, f);
-                let o = cli.output.unwrap().parse::<Output>().unwrap();
-                st.write(&o, &cli.path.unwrap());
+                let o = cli.output.parse::<Output>().unwrap();
+                st.write(&o, &cli.path);
             }
             (Some(d), _) => {
                 let files = find_files_in_dir(&d);
-                let o = cli.output.unwrap().parse::<Output>().unwrap();
-                let path = &cli.path.unwrap();
+                let o = cli.output.parse::<Output>().unwrap();
+                let path = &cli.path;
                 for f in files {
                     let words = find_words_in_file(&f.display().to_string());
                     let st = Stats::build(&words, f);
@@ -98,20 +99,23 @@ impl Stats {
         let file_name = file
             .display()
             .to_string()
-            .replace(&f.display().to_string(), "");
-        println!("{} {}", file.display().to_string(), file_name);
+            .replace(&f.display().to_string(), "")
+            .replace('/', "");
+
+        println!("{}", file_name);
 
         Self {
             term_frequency: stats,
-            file: file_name,
+            file_name,
             length: len,
         }
     }
 
     fn write(&self, o: &Output, p: &str) {
         match o {
-            Output::Json => self.write_json(),
+            Output::Json => self.write_json(p),
             Output::Text => self.write_text(p),
+            Output::Csv => self.write_csv(p),
         }
     }
 
@@ -122,7 +126,7 @@ impl Stats {
         if !path.exists() {
             fs::create_dir(&dir).unwrap();
         }
-        let file_name = dir + "/" + &self.file + ".stats";
+        let file_name = dir + "/" + &self.file_name + ".stats.txt";
 
         let file = File::create(&file_name).unwrap();
         let mut file = BufWriter::new(file);
@@ -132,7 +136,7 @@ impl Stats {
 
         let data = format!(
             "FILE: {:<16} LENGTH: {}\n\n{:<22} {:<22}{}\n{}\n",
-            self.file,
+            self.file_name,
             self.length,
             "WORD:",
             "FREQUENCY:",
@@ -149,9 +153,43 @@ impl Stats {
         file.write_all(data.as_bytes()).unwrap();
     }
 
-    fn write_json(&self) {
-        let file_name = self.file.clone() + ".stats";
-        println!("{}", &file_name);
+    fn write_csv(&self, p: &str) {
+        let dir = p.to_string() + "/result/";
+        let path = std::path::Path::new(&dir);
+
+        if !path.exists() {
+            fs::create_dir(&dir).unwrap();
+        }
+        let file_name = dir + "/" + &self.file_name + ".stats.csv";
+
+        let file = File::create(&file_name).unwrap();
+        let mut file = BufWriter::new(file);
+
+        let mut v: Vec<(String, (usize, f64))> = self.term_frequency.clone().into_iter().collect();
+        v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+
+        let data = format!(
+            "FILE,LENGTH\n{},{}\n\nWORD,FREQUENCY,PERCENT\n",
+            self.file_name, self.length
+        );
+
+        let s = v
+            .iter()
+            .map(|(key, val)| format!("{},{},{}\n", key, val.0, val.1))
+            .collect::<String>();
+
+        let data = data + &s;
+        file.write_all(data.as_bytes()).unwrap();
+    }
+
+    fn write_json(&self, p: &str) {
+        let dir = p.to_string() + "/result/";
+        let path = std::path::Path::new(&dir);
+
+        if !path.exists() {
+            fs::create_dir(&dir).unwrap();
+        }
+        let file_name = dir + "/" + &self.file_name + ".stats.json";
 
         let file = File::create(&file_name).unwrap();
         let mut file = BufWriter::new(file);
@@ -216,6 +254,7 @@ impl FromStr for Output {
         match s.to_lowercase().as_str() {
             "json" => Ok(Output::Json),
             "text" => Ok(Output::Text),
+            "csv" => Ok(Output::Csv),
             _ => Err("invalid output format".to_owned()),
         }
     }
