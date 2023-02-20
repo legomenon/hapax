@@ -40,7 +40,7 @@ You can also specify the output format and the output folder using the -o and -p
 
 ```sh
 
-hapax tf -o csv -p /output/folder/ -f /path/to/file.txt 
+hapax -o csv -p /output/folder/ tf -f /path/to/file.txt 
 ```
 This will save the frequency of words in the file to a CSV file in the specified output folder.
 
