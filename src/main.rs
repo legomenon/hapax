@@ -1,21 +1,32 @@
 use clap::{Parser, Subcommand};
+use serde::Serialize;
+use serde_json::to_string;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufWriter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Serialize, Debug)]
 struct Stats {
-    term_frequency: HashMap<String, (usize, f64)>,
     file: String,
+    // file_path: PathBuf,
     length: usize,
+    term_frequency: HashMap<String, (usize, f64)>,
 }
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    #[arg(short, long, value_name = "./")]
+    /// type of the output file
+    #[clap(default_value = "json")]
+    #[arg(short, long)]
     output: Option<String>,
+    /// path to the output folder
+    #[clap(default_value = "./")]
+    #[arg(short, long)]
+    path: Option<String>,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -33,6 +44,11 @@ enum Commands {
     },
 }
 
+enum Output {
+    Json,
+    Text,
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -40,37 +56,139 @@ fn main() {
         Commands::TF { dir, file } => match (dir, file) {
             (_, Some(f)) => {
                 let words = find_words_in_file(&f);
-                let st = get_stats(&words, &f);
-                write_stats_in_file(&st);
+                let f = PathBuf::from(f);
+                let st = Stats::build(&words, f);
+                let o = cli.output.unwrap().parse::<Output>().unwrap();
+                st.write(&o, &cli.path.unwrap());
             }
-            (Some(d), _) => find_words_in_dir(&d),
+            (Some(d), _) => {
+                let files = find_files_in_dir(&d);
+                let o = cli.output.unwrap().parse::<Output>().unwrap();
+                let path = &cli.path.unwrap();
+                for f in files {
+                    let words = find_words_in_file(&f.display().to_string());
+                    let st = Stats::build(&words, f);
+
+                    st.write(&o, &path);
+                }
+            }
             (None, None) => eprintln!("Provide file path or directory"),
         },
     }
 }
 
+impl Stats {
+    fn build(words: &Vec<String>, file: PathBuf) -> Self {
+        let mut stats: HashMap<String, (usize, f64)> = HashMap::new();
+        let len = words.len();
+
+        words.into_iter().for_each(|w| {
+            stats
+                .entry(w.clone())
+                .and_modify(|counter| counter.0 += 1)
+                .or_insert((1, 0.0));
+        });
+
+        stats.iter_mut().for_each(|(_, v)| {
+            let per = v.0 as f64 * 100.0 / len as f64;
+            v.1 = per;
+        });
+        let mut f = file.clone();
+        f.pop();
+        let file_name = file
+            .display()
+            .to_string()
+            .replace(&f.display().to_string(), "");
+        println!("{} {}", file.display().to_string(), file_name);
+
+        Self {
+            term_frequency: stats,
+            file: file_name,
+            length: len,
+        }
+    }
+
+    fn write(&self, o: &Output, p: &str) {
+        match o {
+            Output::Json => self.write_json(),
+            Output::Text => self.write_text(p),
+        }
+    }
+
+    fn write_text(&self, p: &str) {
+        let dir = p.to_string() + "/result/";
+        let path = std::path::Path::new(&dir);
+
+        if !path.exists() {
+            fs::create_dir(&dir).unwrap();
+        }
+        let file_name = dir + "/" + &self.file + ".stats";
+
+        let file = File::create(&file_name).unwrap();
+        let mut file = BufWriter::new(file);
+
+        let mut v: Vec<(String, (usize, f64))> = self.term_frequency.clone().into_iter().collect();
+        v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+
+        let data = format!(
+            "FILE: {:<16} LENGTH: {}\n\n{:<22} {:<22}{}\n{}\n",
+            self.file,
+            self.length,
+            "WORD:",
+            "FREQUENCY:",
+            "PERCENT:",
+            "-".repeat(53)
+        );
+
+        let s = v
+            .iter()
+            .map(|(key, val)| format!("{:<22} {:<22} {:.2}%\n", key, val.0, val.1))
+            .collect::<String>();
+
+        let data = data + &s;
+        file.write_all(data.as_bytes()).unwrap();
+    }
+
+    fn write_json(&self) {
+        let file_name = self.file.clone() + ".stats";
+        println!("{}", &file_name);
+
+        let file = File::create(&file_name).unwrap();
+        let mut file = BufWriter::new(file);
+
+        let s = to_string(&self).unwrap();
+
+        file.write_all(s.as_bytes()).unwrap();
+    }
+}
 fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>> {
     let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
 }
 
-fn find_words_in_dir<P: AsRef<Path>>(dir: P) {
+fn find_files_in_dir<P: AsRef<Path>>(dir: P) -> Vec<PathBuf> {
     let entries = fs::read_dir(dir).unwrap();
-    entries.for_each(|entry| match entry {
-        Ok(file) => match file.file_name().to_str() {
-            Some(f_name) => {
-                if file.file_type().map_or(false, |t| t.is_file()) {
-                    println!("{}", f_name);
-                    let path = file.path().display().to_string();
-                    let words = find_words_in_file(&path);
-                    let st = get_stats(&words, f_name);
-                    write_stats_in_dir(&st, &path);
+    entries
+        .filter_map(|entry| match entry {
+            Ok(file) => match file.file_name().to_str() {
+                Some(_) => {
+                    if file.file_type().map_or(false, |t| t.is_file()) {
+                        Some(file.path())
+                    } else {
+                        None
+                    }
                 }
+                None => {
+                    eprintln!("error in file {:?}", file);
+                    None
+                }
+            },
+            Err(e) => {
+                eprintln!("error with filename  {:?}", e);
+                None
             }
-            None => eprintln!("error in file {:?}", file),
-        },
-        Err(e) => eprintln!("error with filename  {:?}", e),
-    });
+        })
+        .collect()
 }
 
 fn find_words_in_file(file: &str) -> Vec<String> {
@@ -91,91 +209,14 @@ fn find_words_in_file(file: &str) -> Vec<String> {
         .collect()
 }
 
-fn get_stats(words: &Vec<String>, file: &str) -> Stats {
-    let mut stats: HashMap<String, (usize, f64)> = HashMap::new();
-    let len = words.len();
+impl FromStr for Output {
+    type Err = String;
 
-    words.into_iter().for_each(|w| {
-        stats
-            .entry(w.clone())
-            .and_modify(|counter| counter.0 += 1)
-            .or_insert((1, 0.0));
-    });
-
-    stats.iter_mut().for_each(|(_, v)| {
-        let per = v.0 as f64 * 100.0 / len as f64;
-        v.1 = per;
-    });
-
-    Stats {
-        term_frequency: stats,
-        file: file.to_owned(),
-        length: len,
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "json" => Ok(Output::Json),
+            "text" => Ok(Output::Text),
+            _ => Err("invalid output format".to_owned()),
+        }
     }
-}
-
-fn write_stats_in_dir(s: &Stats, path: &str) {
-    let file_name = &s.file;
-    let dir = path.replace(file_name, "") + "result";
-    let path = std::path::Path::new(&dir);
-
-    if !path.exists() {
-        fs::create_dir(&dir).unwrap();
-    }
-    let file_name = dir + "/" + &s.file;
-
-    let file = File::create(file_name).unwrap();
-    let mut file = BufWriter::new(file);
-
-    let mut v: Vec<(&String, &(usize, f64))> = s.term_frequency.iter().collect();
-    v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
-
-    let head = format!(
-        "FILE: {:<16} LENGTH: {}\n\n{:<22} {:<22}{}\n{}\n",
-        s.file,
-        s.length,
-        "WORD:",
-        "FREQUENCY:",
-        "PERCENT:",
-        "-".repeat(53)
-    );
-
-    file.write(head.as_bytes()).unwrap();
-
-    let s = v
-        .into_iter()
-        .map(|(key, val)| format!("{:<22} {:<22} {:.2}%\n", key, val.0, val.1))
-        .collect::<String>();
-
-    file.write_all(s.as_bytes()).unwrap();
-}
-
-fn write_stats_in_file(s: &Stats) {
-    let file_name = s.file.clone() + "stats";
-    println!("{}", &file_name);
-
-    let file = File::create(&file_name).unwrap();
-    let mut file = BufWriter::new(file);
-
-    let mut v: Vec<(&String, &(usize, f64))> = s.term_frequency.iter().collect();
-    v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
-
-    let head = format!(
-        "FILE: {:<16} LENGTH: {}\n\n{:<22} {:<22}{}\n{}\n",
-        s.file,
-        s.length,
-        "WORD:",
-        "FREQUENCY:",
-        "PERCENT:",
-        "-".repeat(53)
-    );
-
-    file.write(head.as_bytes()).unwrap();
-
-    let s = v
-        .into_iter()
-        .map(|(key, val)| format!("{:<22} {:<22} {:.2}%\n", key, val.0, val.1))
-        .collect::<String>();
-
-    file.write_all(s.as_bytes()).unwrap();
 }
