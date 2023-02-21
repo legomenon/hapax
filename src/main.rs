@@ -7,6 +7,8 @@ use std::io::{self, BufRead, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use rayon::prelude::*;
+
 #[derive(Serialize, Debug)]
 struct Stats {
     file_name: String,
@@ -58,7 +60,7 @@ fn main() {
             (_, Some(f)) => {
                 let words = find_words_in_file(&f);
                 let f = PathBuf::from(f);
-                let st = Stats::build(&words, f);
+                let st = Stats::build(&words, &f);
                 let o = cli.output.parse::<Output>().unwrap();
                 st.write(&o, &cli.path);
             }
@@ -66,12 +68,13 @@ fn main() {
                 let files = find_files_in_dir(&d);
                 let o = cli.output.parse::<Output>().unwrap();
                 let path = &cli.path;
-                for f in files {
+
+                files.par_iter().for_each(|f| {
                     let words = find_words_in_file(&f.display().to_string());
-                    let st = Stats::build(&words, f);
+                    let st = Stats::build(&words, &f);
 
                     st.write(&o, &path);
-                }
+                });
             }
             (None, None) => eprintln!("Provide file path or directory"),
         },
@@ -79,7 +82,7 @@ fn main() {
 }
 
 impl Stats {
-    fn build(words: &Vec<String>, file: PathBuf) -> Self {
+    fn build(words: &Vec<String>, file: &PathBuf) -> Self {
         let mut stats: HashMap<String, (usize, f64)> = HashMap::new();
         let len = words.len();
 
