@@ -53,24 +53,24 @@ impl Stats {
     }
 
     pub fn write(&self, o: &str, p: &str) {
-        match o {
-            "Json" => self.write_json(p),
-            "Text" => self.write_text(p),
-            "Csv" => self.write_csv(p),
-            _ => unreachable!(),
-        }
-    }
-
-    fn write_text(&self, p: &str) {
         let dir = p.to_string() + "/result/";
         let path = std::path::Path::new(&dir);
 
         if !path.exists() {
             fs::create_dir(&dir).unwrap();
         }
-        let file_name = dir + "/" + &self.file_name + ".stats.txt";
+        let file_name = dir + "/" + &self.file_name;
 
-        let file = File::create(file_name).unwrap();
+        match o {
+            "Json" => self.write_json(file_name),
+            "Text" => self.write_text(file_name),
+            "Csv" => self.write_csv(file_name),
+            _ => unreachable!(),
+        }
+    }
+
+    fn write_text(&self, file_name: String) {
+        let file = File::create(file_name + ".stats.txt").unwrap();
         let mut file = BufWriter::new(file);
 
         let mut v: Vec<(&String, &TF)> = self.term_frequency.iter().collect();
@@ -95,16 +95,8 @@ impl Stats {
         file.write_all(data.as_bytes()).unwrap();
     }
 
-    fn write_csv(&self, p: &str) {
-        let dir = p.to_string() + "/result/";
-        let path = std::path::Path::new(&dir);
-
-        if !path.exists() {
-            fs::create_dir(&dir).unwrap();
-        }
-        let file_name = dir + "/" + &self.file_name + ".stats.csv";
-
-        let file = File::create(file_name).unwrap();
+    fn write_csv(&self, file_name: String) {
+        let file = File::create(file_name + ".stats.csv").unwrap();
         let mut file = BufWriter::new(file);
 
         let mut v: Vec<(&String, &TF)> = self.term_frequency.iter().collect();
@@ -124,23 +116,15 @@ impl Stats {
         file.write_all(data.as_bytes()).unwrap();
     }
 
-    fn write_json(&self, p: &str) {
-        let dir = p.to_string() + "/result/";
-        let path = std::path::Path::new(&dir);
-
-        if !path.exists() {
-            fs::create_dir(&dir).unwrap();
-        }
-        let file_name = dir + "/" + &self.file_name + ".stats.json";
-
-        let file = File::create(file_name).unwrap();
+    fn write_json(&self, file_name: String) {
+        let file = File::create(file_name + ".stats.json").unwrap();
         let mut file = BufWriter::new(file);
 
         let s = to_string(&self).unwrap();
-
         file.write_all(s.as_bytes()).unwrap();
     }
 }
+
 pub fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>> {
     let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
