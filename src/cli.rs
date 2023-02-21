@@ -54,15 +54,15 @@ fn main() {
                 st.write(&format!("{o:?}"), &cli.path);
             }
             (Some(d), _) => {
-                let files = find_files_in_dir(&d);
+                let files = find_files_in_dir(d);
                 let o = cli.output.parse::<Output>().unwrap();
                 let path = &cli.path;
 
                 files.par_iter().for_each(|f| {
                     let words = find_words_in_file(&f.display().to_string());
-                    let st = Stats::build(&words, &f);
+                    let st = Stats::build(&words, f);
 
-                    st.write(&format!("{o:?}"), &path);
+                    st.write(&format!("{o:?}"), path);
                 });
             }
             (None, None) => eprintln!("Provide file path or directory"),

@@ -11,26 +11,31 @@ use std::path::{Path, PathBuf};
 pub struct Stats {
     file_name: String,
     length: usize,
-    term_frequency: HashMap<String, (usize, f64)>,
+    term_frequency: HashMap<String, TF>,
+}
+#[derive(Debug, Serialize)]
+struct TF {
+    freq: usize,
+    per: f64,
 }
 
 impl Stats {
-    pub fn build(words: &Vec<String>, file: &PathBuf) -> Self {
-        let mut stats: HashMap<String, (usize, f64)> = HashMap::new();
+    pub fn build(words: &Vec<String>, file: &Path) -> Self {
+        let mut stats: HashMap<String, TF> = HashMap::new();
         let len = words.len();
 
-        words.into_iter().for_each(|w| {
+        words.iter().for_each(|w| {
             stats
                 .entry(w.clone())
-                .and_modify(|counter| counter.0 += 1)
-                .or_insert((1, 0.0));
+                .and_modify(|counter| counter.freq += 1)
+                .or_insert(TF { freq: 1, per: 0.0 });
         });
 
         stats.iter_mut().for_each(|(_, v)| {
-            let per = v.0 as f64 * 100.0 / len as f64;
-            v.1 = per;
+            let per = v.freq as f64 * 100.0 / len as f64;
+            v.per = per;
         });
-        let mut f = file.clone();
+        let mut f = file.to_path_buf();
         f.pop();
         let file_name = file
             .display()
@@ -65,11 +70,11 @@ impl Stats {
         }
         let file_name = dir + "/" + &self.file_name + ".stats.txt";
 
-        let file = File::create(&file_name).unwrap();
+        let file = File::create(file_name).unwrap();
         let mut file = BufWriter::new(file);
 
-        let mut v: Vec<(String, (usize, f64))> = self.term_frequency.clone().into_iter().collect();
-        v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+        let mut v: Vec<(&String, &TF)> = self.term_frequency.iter().collect();
+        v.sort_by(|a, b| b.1.freq.cmp(&a.1.freq));
 
         let data = format!(
             "FILE: {:<16} LENGTH: {}\n\n{:<22} {:<22}{}\n{}\n",
@@ -83,7 +88,7 @@ impl Stats {
 
         let s = v
             .iter()
-            .map(|(key, val)| format!("{:<22} {:<22} {:.2}%\n", key, val.0, val.1))
+            .map(|(key, val)| format!("{:<22} {:<22} {:.2}%\n", key, val.freq, val.per))
             .collect::<String>();
 
         let data = data + &s;
@@ -99,11 +104,11 @@ impl Stats {
         }
         let file_name = dir + "/" + &self.file_name + ".stats.csv";
 
-        let file = File::create(&file_name).unwrap();
+        let file = File::create(file_name).unwrap();
         let mut file = BufWriter::new(file);
 
-        let mut v: Vec<(String, (usize, f64))> = self.term_frequency.clone().into_iter().collect();
-        v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+        let mut v: Vec<(&String, &TF)> = self.term_frequency.iter().collect();
+        v.sort_by(|a, b| b.1.freq.cmp(&a.1.freq));
 
         let data = format!(
             "FILE,LENGTH\n{},{}\n\nWORD,FREQUENCY,PERCENT\n",
@@ -112,7 +117,7 @@ impl Stats {
 
         let s = v
             .iter()
-            .map(|(key, val)| format!("{},{},{}\n", key, val.0, val.1))
+            .map(|(key, val)| format!("{},{},{}\n", key, val.freq, val.per))
             .collect::<String>();
 
         let data = data + &s;
@@ -128,7 +133,7 @@ impl Stats {
         }
         let file_name = dir + "/" + &self.file_name + ".stats.json";
 
-        let file = File::create(&file_name).unwrap();
+        let file = File::create(file_name).unwrap();
         let mut file = BufWriter::new(file);
 
         let s = to_string(&self).unwrap();
@@ -144,25 +149,9 @@ pub fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufRe
 pub fn find_files_in_dir<P: AsRef<Path>>(dir: P) -> Vec<PathBuf> {
     let entries = fs::read_dir(dir).unwrap();
     entries
-        .filter_map(|entry| match entry {
-            Ok(file) => match file.file_name().to_str() {
-                Some(_) => {
-                    if file.file_type().map_or(false, |t| t.is_file()) {
-                        Some(file.path())
-                    } else {
-                        None
-                    }
-                }
-                None => {
-                    eprintln!("error in file {:?}", file);
-                    None
-                }
-            },
-            Err(e) => {
-                eprintln!("error with filename  {:?}", e);
-                None
-            }
-        })
+        .flatten()
+        .filter(|file| file.file_type().map_or(false, |t| t.is_file()))
+        .map(|file| file.path())
         .collect()
 }
 
@@ -175,11 +164,10 @@ pub fn find_words_in_file(file: &str) -> Vec<String> {
             Ok(l) => Some(l),
             Err(_) => None,
         })
-        .map(|l| {
+        .flat_map(|l| {
             re.find_iter(&l)
                 .map(|w| w.as_str().to_owned().to_lowercase())
                 .collect::<Vec<String>>()
         })
-        .flatten()
         .collect()
 }
