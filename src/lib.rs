@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 pub struct Stats {
     pub file_name: String,
     length: usize,
+
     term_frequency: HashMap<String, TF>,
 }
 #[derive(Debug, Serialize)]
@@ -50,13 +51,36 @@ impl Stats {
             length: len,
         }
     }
+    pub fn new_total() -> Self {
+        Self {
+            file_name: "total".to_owned(),
+            length: 0,
+            term_frequency: HashMap::new(),
+        }
+    }
+
+    pub fn extend(&mut self, words: &[String]) {
+        self.length += words.len();
+
+        words.iter().for_each(|w| {
+            self.term_frequency
+                .entry(w.clone())
+                .and_modify(|counter| counter.freq += 1)
+                .or_insert(TF { freq: 1, per: 0.0 });
+        });
+
+        self.term_frequency.iter_mut().for_each(|(_, v)| {
+            let per = v.freq as f64 * 100.0 / self.length as f64;
+            v.per = per;
+        });
+    }
 
     pub fn write(&self, o: &str, p: &str) -> io::Result<()> {
         let dir = p.to_string() + "/result/";
         let path = std::path::Path::new(&dir);
 
         if !path.exists() {
-            fs::create_dir(&dir).unwrap();
+            fs::create_dir(&dir)?;
         }
         let file_name = dir + "/" + &self.file_name;
 

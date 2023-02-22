@@ -3,6 +3,7 @@ use hapax::{find_files_in_dir, find_words_in_file, Stats};
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Mutex;
 
 use rayon::prelude::*;
 
@@ -24,14 +25,20 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// provides term frequency
-    TF {
+    /// provides term frequency TF
+    Tf {
         /// file for parsing
         #[arg(short, long)]
         file: Option<String>,
         /// dir for parsing
         #[arg(short, long, conflicts_with("file"))]
         dir: Option<String>,
+    },
+    /// provides term frequency for all documents words comb
+    Tft {
+        /// dir for parsing
+        #[arg(short, long)]
+        dir: String,
     },
 }
 #[derive(Debug)]
@@ -45,52 +52,112 @@ fn main() -> io::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::TF { dir, file } => match (dir, file) {
+        Commands::Tf { dir, file } => match (dir, file) {
             (_, Some(f)) => {
                 let words = find_words_in_file(&f)?;
                 let f = PathBuf::from(f);
                 if words.is_empty() {
                     println!(
-                        "{:<10}{:?} is empty | can not read a file",
+                        "{:<15}{:?} is empty ",
                         "WARNING",
-                        f.file_name().unwrap()
+                        f.file_name().expect("file name is invalid")
                     );
                     std::process::exit(0);
                 }
+                println!(
+                    "{:<14} {}",
+                    "PARSING",
+                    f.file_name()
+                        .expect("file name is invalid")
+                        .to_string_lossy()
+                );
                 let st = Stats::new(&words, &f);
 
-                let o = cli.output.parse::<Output>().unwrap();
+                let o = cli
+                    .output
+                    .parse::<Output>()
+                    .expect("can not parse cli command");
 
                 match st.write(&format!("{o:?}"), &cli.path) {
-                    Ok(_) => println!("{:<10}{}", "OK", st.file_name),
-                    Err(e) => println!("{:<10}{}:{}", "ERROR", st.file_name, e),
+                    Ok(_) => println!("{:<15}{}", "OK", st.file_name),
+                    Err(e) => println!("{:<15}{}:{}", "ERROR", st.file_name, e),
                 }
             }
             (Some(d), _) => {
                 let files = find_files_in_dir(d)?;
-                let o = cli.output.parse::<Output>().unwrap();
-                println!("Parsing {} files:", files.len());
+                let o = cli
+                    .output
+                    .parse::<Output>()
+                    .expect("can not parse cli command");
+
+                println!("Parsing {} files:\n\n", files.len());
 
                 files.par_iter().for_each(|f| {
                     let words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
                     if words.is_empty() {
                         println!(
-                            "{:<10}{:?} is empty | can not read a file",
+                            "{:<15}{} is empty | can not read a file",
                             "WARNING",
-                            f.file_name().unwrap()
+                            f.file_name()
+                                .expect("file name is invalid")
+                                .to_string_lossy()
                         );
                         return;
                     }
+
+                    println!(
+                        "{:<14} {}",
+                        "PARSING",
+                        f.file_name()
+                            .expect("file name is invalid")
+                            .to_string_lossy()
+                    );
                     let st = Stats::new(&words, f);
 
                     match st.write(&format!("{o:?}"), &cli.path) {
-                        Ok(_) => println!("{:<10}{}", "OK", st.file_name),
-                        Err(e) => println!("{:<10}{}:{}", "ERROR", st.file_name, e),
+                        Ok(_) => println!("{:<15}{}", "OK", st.file_name),
+                        Err(e) => println!("{:<15}{}:{}", "ERROR", st.file_name, e),
                     }
                 });
             }
             (None, None) => eprintln!("Provide file path or directory"),
         },
+        Commands::Tft { dir: tdir } => {
+            let files = find_files_in_dir(tdir)?;
+            let o = cli
+                .output
+                .parse::<Output>()
+                .expect("can not parse cli command");
+
+            println!("PARSING {} FILES:\n", files.len());
+            let st = Mutex::new(Stats::new_total());
+            files.par_iter().for_each(|f| {
+                let words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+                if words.is_empty() {
+                    println!(
+                        "{:<15}{:?} is empty | can not read a file",
+                        "WARNING",
+                        f.file_name()
+                            .expect("file name is invalid")
+                            .to_string_lossy()
+                    );
+                    return;
+                }
+                println!(
+                    "{:<15} {:?}",
+                    "PARSING",
+                    f.file_name()
+                        .expect("file name is invalid")
+                        .to_string_lossy()
+                );
+                st.lock().unwrap().extend(&words);
+            });
+            let st = st.lock().unwrap();
+            match st.write(&format!("{o:?}"), &cli.path) {
+                Ok(_) => println!("\n\n{:<15}{}", "OK", st.file_name),
+                Err(e) => println!("\n\n{:<15}{}:{}", "ERROR", st.file_name, e),
+            }
+        }
     }
     Ok(())
 }
