@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use hapax::{find_files_in_dir, find_words_in_file, Stats};
+use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -40,34 +41,58 @@ enum Output {
     Csv,
 }
 
-fn main() {
+fn main() -> io::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
         Commands::TF { dir, file } => match (dir, file) {
             (_, Some(f)) => {
-                let words = find_words_in_file(&f);
+                let words = find_words_in_file(&f)?;
                 let f = PathBuf::from(f);
-                let st = Stats::build(&words, &f);
+                if words.is_empty() {
+                    println!(
+                        "{:<10}{:?} is empty | can not read a file",
+                        "WARNING",
+                        f.file_name().unwrap()
+                    );
+                    std::process::exit(0);
+                }
+                let st = Stats::new(&words, &f);
+
                 let o = cli.output.parse::<Output>().unwrap();
 
-                st.write(&format!("{o:?}"), &cli.path);
+                match st.write(&format!("{o:?}"), &cli.path) {
+                    Ok(_) => println!("{:<10}{}", "OK", st.file_name),
+                    Err(e) => println!("{:<10}{}:{}", "ERROR", st.file_name, e),
+                }
             }
             (Some(d), _) => {
-                let files = find_files_in_dir(d);
+                let files = find_files_in_dir(d)?;
                 let o = cli.output.parse::<Output>().unwrap();
-                let path = &cli.path;
+                println!("Parsing {} files:", files.len());
 
                 files.par_iter().for_each(|f| {
-                    let words = find_words_in_file(&f.display().to_string());
-                    let st = Stats::build(&words, f);
+                    let words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+                    if words.is_empty() {
+                        println!(
+                            "{:<10}{:?} is empty | can not read a file",
+                            "WARNING",
+                            f.file_name().unwrap()
+                        );
+                        return;
+                    }
+                    let st = Stats::new(&words, f);
 
-                    st.write(&format!("{o:?}"), path);
+                    match st.write(&format!("{o:?}"), &cli.path) {
+                        Ok(_) => println!("{:<10}{}", "OK", st.file_name),
+                        Err(e) => println!("{:<10}{}:{}", "ERROR", st.file_name, e),
+                    }
                 });
             }
             (None, None) => eprintln!("Provide file path or directory"),
         },
     }
+    Ok(())
 }
 
 impl FromStr for Output {

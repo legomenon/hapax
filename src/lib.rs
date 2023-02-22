@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Debug)]
 pub struct Stats {
-    file_name: String,
+    pub file_name: String,
     length: usize,
     term_frequency: HashMap<String, TF>,
 }
@@ -20,7 +20,7 @@ struct TF {
 }
 
 impl Stats {
-    pub fn build(words: &Vec<String>, file: &Path) -> Self {
+    pub fn new(words: &Vec<String>, file: &Path) -> Self {
         let mut stats: HashMap<String, TF> = HashMap::new();
         let len = words.len();
 
@@ -35,6 +35,7 @@ impl Stats {
             let per = v.freq as f64 * 100.0 / len as f64;
             v.per = per;
         });
+
         let mut f = file.to_path_buf();
         f.pop();
         let file_name = file
@@ -43,8 +44,6 @@ impl Stats {
             .replace(&f.display().to_string(), "")
             .replace('/', "");
 
-        println!("{}", file_name);
-
         Self {
             term_frequency: stats,
             file_name,
@@ -52,7 +51,7 @@ impl Stats {
         }
     }
 
-    pub fn write(&self, o: &str, p: &str) {
+    pub fn write(&self, o: &str, p: &str) -> io::Result<()> {
         let dir = p.to_string() + "/result/";
         let path = std::path::Path::new(&dir);
 
@@ -62,15 +61,16 @@ impl Stats {
         let file_name = dir + "/" + &self.file_name;
 
         match o {
-            "Json" => self.write_json(file_name),
-            "Text" => self.write_text(file_name),
-            "Csv" => self.write_csv(file_name),
+            "Json" => self.write_json(file_name)?,
+            "Text" => self.write_text(file_name)?,
+            "Csv" => self.write_csv(file_name)?,
             _ => unreachable!(),
         }
+        Ok(())
     }
 
-    fn write_text(&self, file_name: String) {
-        let file = File::create(file_name + ".stats.txt").unwrap();
+    fn write_text(&self, file_name: String) -> io::Result<()> {
+        let file = File::create(file_name + ".stats.txt")?;
         let mut file = BufWriter::new(file);
 
         let mut v: Vec<(&String, &TF)> = self.term_frequency.iter().collect();
@@ -92,11 +92,12 @@ impl Stats {
             .collect::<String>();
 
         let data = data + &s;
-        file.write_all(data.as_bytes()).unwrap();
+        file.write_all(data.as_bytes())?;
+        Ok(())
     }
 
-    fn write_csv(&self, file_name: String) {
-        let file = File::create(file_name + ".stats.csv").unwrap();
+    fn write_csv(&self, file_name: String) -> io::Result<()> {
+        let file = File::create(file_name + ".stats.csv")?;
         let mut file = BufWriter::new(file);
 
         let mut v: Vec<(&String, &TF)> = self.term_frequency.iter().collect();
@@ -113,15 +114,17 @@ impl Stats {
             .collect::<String>();
 
         let data = data + &s;
-        file.write_all(data.as_bytes()).unwrap();
+        file.write_all(data.as_bytes())?;
+        Ok(())
     }
 
-    fn write_json(&self, file_name: String) {
-        let file = File::create(file_name + ".stats.json").unwrap();
+    fn write_json(&self, file_name: String) -> io::Result<()> {
+        let file = File::create(file_name + ".stats.json")?;
         let mut file = BufWriter::new(file);
 
-        let s = to_string(&self).unwrap();
-        file.write_all(s.as_bytes()).unwrap();
+        let s = to_string(&self)?;
+        file.write_all(s.as_bytes())?;
+        Ok(())
     }
 }
 
@@ -130,20 +133,20 @@ pub fn read_lines<P: AsRef<Path>>(filename: P) -> io::Result<io::Lines<io::BufRe
     Ok(io::BufReader::new(file).lines())
 }
 
-pub fn find_files_in_dir<P: AsRef<Path>>(dir: P) -> Vec<PathBuf> {
-    let entries = fs::read_dir(dir).unwrap();
-    entries
+pub fn find_files_in_dir<P: AsRef<Path>>(dir: P) -> io::Result<Vec<PathBuf>> {
+    let entries = fs::read_dir(dir)?;
+    Ok(entries
         .flatten()
         .filter(|file| file.file_type().map_or(false, |t| t.is_file()))
         .map(|file| file.path())
-        .collect()
+        .collect())
 }
 
-pub fn find_words_in_file(file: &str) -> Vec<String> {
-    let re = regex::Regex::new(r#"\b[\p{L}’'-]+\b"#).unwrap();
-    let lines = read_lines(file).unwrap();
+pub fn find_words_in_file(file: &str) -> io::Result<Vec<String>> {
+    let re = regex::Regex::new(r#"\b[\p{L}’'-]+\b"#).expect("Failed to parse regex");
+    let lines = read_lines(file)?;
 
-    lines
+    Ok(lines
         .filter_map(|l| match l {
             Ok(l) => Some(l),
             Err(_) => None,
@@ -153,5 +156,5 @@ pub fn find_words_in_file(file: &str) -> Vec<String> {
                 .map(|w| w.as_str().to_owned().to_lowercase())
                 .collect::<Vec<String>>()
         })
-        .collect()
+        .collect())
 }
