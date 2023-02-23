@@ -118,7 +118,10 @@ fn main() -> io::Result<()> {
                             .expect("file name is invalid")
                             .to_string_lossy()
                     );
-                    let st = Stats::new(&words, f);
+                    let mut st = Stats::new(&words, f);
+                    if cli.junk {
+                        st.exclude_junk("./junk_words.txt");
+                    }
 
                     match st.write(&format!("{o:?}"), &cli.path) {
                         Ok(_) => println!("{:<15}{}", "OK", st.file_name),
@@ -158,7 +161,10 @@ fn main() -> io::Result<()> {
                 );
                 st.lock().unwrap().extend(&words);
             });
-            let st = st.lock().unwrap();
+            let mut st = st.lock().unwrap();
+            if cli.junk {
+                st.exclude_junk("./junk_words.txt");
+            }
             match st.write(&format!("{o:?}"), &cli.path) {
                 Ok(_) => println!("\n\n{:<15}{}", "OK", st.file_name),
                 Err(e) => println!("\n\n{:<15}{}:{}", "ERROR", st.file_name, e),

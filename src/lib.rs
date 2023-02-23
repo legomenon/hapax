@@ -184,7 +184,8 @@ pub fn find_files_in_dir<P: AsRef<Path>>(dir: P) -> io::Result<Vec<PathBuf>> {
 }
 
 pub fn find_words_in_file(file: &str) -> io::Result<Vec<String>> {
-    let re = regex::Regex::new(r#"\b[\p{L}’'-]+\b"#).expect("Failed to parse regex");
+    let re = regex::Regex::new(r#"(?:[A-Za-z]+-?'?[A-Za-z]+)|(?:[A-Za-z]+)"#)
+        .expect("Failed to parse regex");
     let lines = read_lines(file)?;
 
     Ok(lines
