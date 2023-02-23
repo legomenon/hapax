@@ -1,6 +1,6 @@
-# Rust CLI Term Frequency Analyzer Project
+# Rust CLI Term Frequency Analyzer 
 
-TFA is a Rust command-line interface (CLI) tool for finding the frequency of words in files. This tool provides a simple and efficient way to analyze the frequency of words in a given text file.
+Hapax is a Rust command-line interface (CLI) tool for finding the frequency of words in files. This tool provides a simple and efficient way to analyze the frequency of words in a given text file.
 Getting Started
 
 To get started with TFA, first, clone the repository and navigate to the root directory of the project. Then, run the following command to build the project:
@@ -19,14 +19,14 @@ hapax [OPTIONS] <COMMAND>
 TFA provides the following options and commands:
 ### Options:
 ```sh
-  -o, --output <OUTPUT>  type of the output file: json/csv/txt [default: json]
+  -o, --output <OUTPUT>  type of the output file: json/csv/text [default: json]
   -p, --path <PATH>      path to the output folder [default: ./]
+  -j, --junk             exclude junk words
   -h, --help             Print help
   -V, --version          Print version
 ```
 ## Commands:
-  tf    provides term frequency
-  help  Print this message or the help of the given subcommand(s)
+  ## tf    provides term frequency
 
 To get the frequency of words in a text file, you can use the tf command followed by the path to the file. For example:
 
@@ -44,6 +44,15 @@ hapax -o csv -p /output/folder/ tf -f /path/to/file.txt
 ```
 This will save the frequency of words in the file to a CSV file in the specified output folder.
 
+### tft    provides term frequency for all documents words combined
+
+To get the frequency of all words excluding junk words from all files in specified directory in one file , you can use the tft command followed by the path to the directory.  For example:
+
+```sh
+
+hapax -j tft -d /my_folder
+```
+
 ## Output Formats:
 
 TFA supports three output formats: txt, json, and csv.
@@ -57,10 +66,12 @@ The tfa tool currently supports three output formats: JSON, CSV, and plain text.
 
 Below are the examples of how each format looks like for the same input file:
 ### TXT Output
-
-
 ```sh
-FILE: ga.srt           LENGTH: 10094
+hapax -o text tf -f ./subtitles/ga.srt
+```
+
+```
+FILE: ga.srt           LENGTH: 10094         TOTAL:293434
 
 WORD:                  FREQUENCY:            PERCENT:
 -----------------------------------------------------
@@ -69,17 +80,14 @@ i                      370                    3.67%
 the                    282                    2.79%
 to                     228                    2.26%
 a                      219                    2.17%
-and                    142                    1.41%
-of                     135                    1.34%
-it                     129                    1.28%
-what                   120                    1.19%
-is                     120                    1.19%
 ...
 ```
 
 ### JSON Output
-
 ```sh
+hapax -o json tf -f ./subtitles/ga.srt
+```
+```
 json
 
 {
@@ -94,22 +102,16 @@ json
       8,
       0.07925500297206262
     ],
-    "discussion": [
-      1,
-      0.009906875371507827
-    ],
-    "gasps": [
-      12,
-      0.11888250445809392
-    ],
 	}
     ...
  }
 
 ```
 ### CSV Output
-
 ```sh
+hapax -o csv tf -f ./subtitles/ga.srt
+```
+```
 css
 
 FILE,LENGTH
@@ -120,11 +122,65 @@ you,387,3.8339607687735286
 i,370,3.6655438874578956
 what,120,1.1888250445809392
 that,109,1.079849415494353
-me,106,1.0501287893798297
-my,100,0.9906875371507826
-all,95,0.9411531602932435
-this,81,0.802456905092134
-are,74,0.7331087774915792
-your,72,0.7132950267485635
+...
+```
+## 10k film's subtitles files analysis: 
+```sh
+hapax_cli -o text -j tft -d films/
+```
+## 50 most popular words:
+
+total.stats.txt:
+```
+FILE: total            UNIQUE: 177480        TOTAL:20525222
+
+WORD:                  FREQUENCY:            PERCENT:
+-----------------------------------------------------
+yeah                   248976                 1.21%
+look                   187791                 0.91%
+okay                   181334                 0.88%
+tell                   157088                 0.77%
+gonna                  146881                 0.72%
+time                   142885                 0.70%
+hey                    142145                 0.69%
+fuck                   124926                 0.61%
+thank                  112856                 0.55%
+mean                   104192                 0.51%
+love                   90873                  0.44%
+please                 88952                  0.43%
+guy                    87982                  0.43%
+little                 87758                  0.43%
+call                   85377                  0.42%
+talk                   84739                  0.41%
+sorry                  83662                  0.41%
+leave                  82682                  0.40%
+day                    76148                  0.37%
+people                 75338                  0.37%
+god                    73811                  0.36%
+wait                   73303                  0.36%
+help                   69718                  0.34%
+try                    69097                  0.34%
+stop                   66958                  0.33%
+happen                 63814                  0.31%
+hear                   63714                  0.31%
+shit                   58637                  0.29%
+sir                    58457                  0.28%
+kill                   55687                  0.27%
+win                    55246                  0.27%
+life                   54589                  0.27%
+night                  54383                  0.26%
+girl                   52709                  0.26%
+maybe                  52289                  0.25%
+home                   51528                  0.25%
+name                   50460                  0.25%
+boy                    49420                  0.24%
+live                   48654                  0.24%
+kid                    47555                  0.23%
+friend                 47449                  0.23%
+stay                   46618                  0.23%
+play                   44919                  0.22%
+move                   44866                  0.22%
+start                  44013                  0.21%
+listen                 43242                  0.21%
 ...
 ```
