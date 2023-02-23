@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use hapax::{find_files_in_dir, find_words_in_file, Stats};
+use hapax::{find_files_in_dir, find_words_in_file, lemmanization, Stats};
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -58,12 +58,15 @@ fn main() -> io::Result<()> {
         Commands::Tf { dir, file } => match (dir, file) {
             (_, Some(f)) => {
                 let words = find_words_in_file(&f)?;
+                let words = lemmanization(words)?;
                 let f = PathBuf::from(f);
                 if words.is_empty() {
                     println!(
-                        "{:<15}{:?} is empty ",
+                        "{:<16}{} is empty ",
                         "WARNING",
-                        f.file_name().expect("file name is invalid")
+                        f.file_name()
+                            .expect("file name is invalid")
+                            .to_string_lossy()
                     );
                     std::process::exit(0);
                 }
@@ -100,9 +103,10 @@ fn main() -> io::Result<()> {
 
                 files.par_iter().for_each(|f| {
                     let words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+                    let words = lemmanization(words).unwrap_or(Vec::new());
                     if words.is_empty() {
                         println!(
-                            "{:<15}{} is empty | can not read a file",
+                            "{:<16}{} is empty | can not read a file",
                             "WARNING",
                             f.file_name()
                                 .expect("file name is invalid")
@@ -142,9 +146,10 @@ fn main() -> io::Result<()> {
             let st = Mutex::new(Stats::new_total());
             files.par_iter().for_each(|f| {
                 let words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+                let words = lemmanization(words).unwrap_or(Vec::new());
                 if words.is_empty() {
                     println!(
-                        "{:<15}{:?} is empty | can not read a file",
+                        "{:<16}{} is empty | can not read a file",
                         "WARNING",
                         f.file_name()
                             .expect("file name is invalid")
@@ -153,7 +158,7 @@ fn main() -> io::Result<()> {
                     return;
                 }
                 println!(
-                    "{:<15} {:?}",
+                    "{:<15} {}",
                     "PARSING",
                     f.file_name()
                         .expect("file name is invalid")

@@ -83,12 +83,6 @@ impl Stats {
                 self.term_frequency.remove(w.as_str());
             }
         });
-
-        // self.term_frequency.iter_mut().for_each(|w| {
-        //     if j_set.contains(w.0.as_str()) {
-        //         self.term_frequency.remove(w.0.as_str());
-        //     }
-        // });
         self.length = self.term_frequency.len();
     }
 
@@ -184,8 +178,7 @@ pub fn find_files_in_dir<P: AsRef<Path>>(dir: P) -> io::Result<Vec<PathBuf>> {
 }
 
 pub fn find_words_in_file(file: &str) -> io::Result<Vec<String>> {
-    let re = regex::Regex::new(r#"(?:[A-Za-z]+-?'?[A-Za-z]+)|(?:[A-Za-z]+)"#)
-        .expect("Failed to parse regex");
+    let re = regex::Regex::new(r#"\b[A-Za-z]+\b"#).expect("Failed to parse regex");
     let lines = read_lines(file)?;
 
     Ok(lines
@@ -199,4 +192,31 @@ pub fn find_words_in_file(file: &str) -> io::Result<Vec<String>> {
                 .collect::<Vec<String>>()
         })
         .collect())
+}
+
+pub fn lemmanization(v: Vec<String>) -> io::Result<Vec<String>> {
+    let file = fs::read_to_string("./lemmas.txt")?;
+    let l = file
+        .split('\n')
+        .map(|l| l.split(' ').map(|w| w.to_owned()).collect::<Vec<_>>())
+        .map(|w: Vec<String>| {
+            let word = w[0].clone();
+            let lemmas: Vec<String> = w[1..].to_vec();
+            (word, lemmas)
+        })
+        .collect::<Vec<_>>();
+
+    let mut lemma: HashMap<String, String> = HashMap::new();
+    l.into_iter().for_each(|w| {
+        w.1.into_iter().for_each(|l| {
+            lemma.insert(l, w.0.clone());
+        })
+    });
+
+    let mut new_v: Vec<String> = Vec::new();
+    v.into_iter().for_each(|w| match lemma.get(&w) {
+        Some(l) => new_v.push(l.to_owned()),
+        None => new_v.push(w),
+    });
+    Ok(new_v)
 }
