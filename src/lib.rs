@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 #[derive(Serialize, Debug)]
 pub struct Stats {
     pub file_name: String,
-    length: usize,
-
+    unique: usize,
+    total: usize,
     term_frequency: HashMap<String, TF>,
 }
 #[derive(Debug, Serialize)]
@@ -22,17 +22,20 @@ struct TF {
 
 impl Stats {
     pub fn new(words: &Vec<String>, file: &Path) -> Self {
-        let mut stats: HashMap<String, TF> = HashMap::new();
+        let mut term_frequency: HashMap<String, TF> = HashMap::new();
         let len = words.len();
 
+        let mut total: usize = 0;
+
         words.iter().for_each(|w| {
-            stats
+            term_frequency
                 .entry(w.clone())
                 .and_modify(|counter| counter.freq += 1)
                 .or_insert(TF { freq: 1, per: 0.0 });
         });
 
-        stats.iter_mut().for_each(|(_, v)| {
+        term_frequency.iter_mut().for_each(|(_, v)| {
+            total += v.freq;
             let per = v.freq as f64 * 100.0 / len as f64;
             v.per = per;
         });
@@ -45,34 +48,32 @@ impl Stats {
             .replace(&f.display().to_string(), "")
             .replace('/', "");
 
+        let unique = term_frequency.len();
+
         Self {
-            term_frequency: stats,
+            term_frequency,
             file_name,
-            length: len,
+            unique,
+            total,
         }
     }
     pub fn new_total() -> Self {
         Self {
             file_name: "total".to_owned(),
-            length: 0,
+            unique: 0,
             term_frequency: HashMap::new(),
+            total: 0,
         }
     }
 
     pub fn extend(&mut self, words: &[String]) {
-        self.length += words.len();
-
         words.iter().for_each(|w| {
             self.term_frequency
                 .entry(w.clone())
                 .and_modify(|counter| counter.freq += 1)
                 .or_insert(TF { freq: 1, per: 0.0 });
         });
-
-        self.term_frequency.iter_mut().for_each(|(_, v)| {
-            let per = v.freq as f64 * 100.0 / self.length as f64;
-            v.per = per;
-        });
+        self.recalculate();
     }
 
     pub fn exclude_junk<P: AsRef<Path>>(&mut self, s: P) {
@@ -83,7 +84,19 @@ impl Stats {
                 self.term_frequency.remove(w.as_str());
             }
         });
-        self.length = self.term_frequency.len();
+        self.recalculate();
+    }
+
+    fn recalculate(&mut self) {
+        self.total = 1;
+        self.unique = self.term_frequency.len();
+        self.term_frequency.iter().for_each(|(_, v)| {
+            self.total += v.freq;
+        });
+        self.term_frequency.iter_mut().for_each(|(_, v)| {
+            let per = v.freq as f64 * 100.0 / self.total as f64;
+            v.per = per;
+        });
     }
 
     pub fn write(&self, o: &str, p: &str) -> io::Result<()> {
@@ -112,9 +125,10 @@ impl Stats {
         v.sort_by(|a, b| b.1.freq.cmp(&a.1.freq));
 
         let data = format!(
-            "FILE: {:<16} LENGTH: {}\n\n{:<22} {:<22}{}\n{}\n",
+            "FILE: {:<16} UNIQUE: {:<13} TOTAL:{}\n\n{:<22} {:<22}{}\n{}\n",
             self.file_name,
-            self.length,
+            self.unique,
+            self.total,
             "WORD:",
             "FREQUENCY:",
             "PERCENT:",
@@ -139,8 +153,8 @@ impl Stats {
         v.sort_by(|a, b| b.1.freq.cmp(&a.1.freq));
 
         let data = format!(
-            "FILE,LENGTH\n{},{}\n\nWORD,FREQUENCY,PERCENT\n",
-            self.file_name, self.length
+            "FILE,UNIQUE,TOTAL\n{},{},{}\n\nWORD,FREQUENCY,PERCENT\n",
+            self.file_name, self.unique, self.total
         );
 
         let s = v
@@ -179,6 +193,7 @@ pub fn find_files_in_dir<P: AsRef<Path>>(dir: P) -> io::Result<Vec<PathBuf>> {
 
 pub fn find_words_in_file(file: &str) -> io::Result<Vec<String>> {
     let re = regex::Regex::new(r#"\b[A-Za-z]+\b"#).expect("Failed to parse regex");
+    let br = regex::Regex::new(r#"<[^>]+>"#).expect("Failed to parse regex");
     let lines = read_lines(file)?;
 
     Ok(lines
@@ -187,7 +202,8 @@ pub fn find_words_in_file(file: &str) -> io::Result<Vec<String>> {
             Err(_) => None,
         })
         .flat_map(|l| {
-            re.find_iter(&l)
+            let r: String = br.replace_all(&l, "").into();
+            re.find_iter(&r)
                 .map(|w| w.as_str().to_owned().to_lowercase())
                 .collect::<Vec<String>>()
         })
