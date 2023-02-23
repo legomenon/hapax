@@ -18,6 +18,9 @@ struct Cli {
     #[clap(default_value = "./")]
     #[arg(short, long)]
     path: String,
+    /// exclude junk words
+    #[arg(short, long)]
+    junk: bool,
 
     #[command(subcommand)]
     command: Commands,
@@ -71,12 +74,15 @@ fn main() -> io::Result<()> {
                         .expect("file name is invalid")
                         .to_string_lossy()
                 );
-                let st = Stats::new(&words, &f);
+                let mut st = Stats::new(&words, &f);
 
                 let o = cli
                     .output
                     .parse::<Output>()
                     .expect("can not parse cli command");
+                if cli.junk {
+                    st.exclude_junk("./junk_words.txt");
+                }
 
                 match st.write(&format!("{o:?}"), &cli.path) {
                     Ok(_) => println!("{:<15}{}", "OK", st.file_name),

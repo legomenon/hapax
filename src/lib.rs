@@ -1,6 +1,6 @@
 use serde::Serialize;
 use serde_json::to_string;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -73,6 +73,23 @@ impl Stats {
             let per = v.freq as f64 * 100.0 / self.length as f64;
             v.per = per;
         });
+    }
+
+    pub fn exclude_junk<P: AsRef<Path>>(&mut self, s: P) {
+        let j_words = fs::read_to_string(s).expect("Couldn't read junk words");
+        let j_set: HashSet<String> = j_words.split('\n').map(|w| w.to_lowercase()).collect();
+        j_set.iter().for_each(|w| {
+            if self.term_frequency.contains_key(w.as_str()) {
+                self.term_frequency.remove(w.as_str());
+            }
+        });
+
+        // self.term_frequency.iter_mut().for_each(|w| {
+        //     if j_set.contains(w.0.as_str()) {
+        //         self.term_frequency.remove(w.0.as_str());
+        //     }
+        // });
+        self.length = self.term_frequency.len();
     }
 
     pub fn write(&self, o: &str, p: &str) -> io::Result<()> {
