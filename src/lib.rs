@@ -137,7 +137,7 @@ impl Stats {
 
         let s = v
             .iter()
-            .map(|(key, val)| format!("{:<22} {:<22} {:.2}%\n", key, val.freq, val.per))
+            .map(|(key, val)| format!("{:<22} {:<22} {:.3}%\n", key, val.freq, val.per))
             .collect::<String>();
 
         let data = data + &s;

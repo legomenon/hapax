@@ -88,7 +88,7 @@ fn process_files(files: &Vec<PathBuf>, cli: Arc<Cli>) {
         }
         if words.is_empty() {
             println!(
-                "{:<15}{} not exist | can not be read",
+                "{:<15}{} not exist | could not be read",
                 "WARNING",
                 f.file_name()
                     .expect("file name is invalid")
@@ -134,7 +134,7 @@ fn process_files_total(files: &Vec<PathBuf>, cli: Arc<Cli>) {
 
         if words.is_empty() {
             println!(
-                "{:<16}{} is empty | can not be read",
+                "{:<16}{} is empty | could not be read",
                 "WARNING",
                 f.file_name()
                     .expect("file name is invalid")
@@ -142,6 +142,7 @@ fn process_files_total(files: &Vec<PathBuf>, cli: Arc<Cli>) {
             );
             return;
         }
+
         println!(
             "{:<15} {}",
             "PARSING",
