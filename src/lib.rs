@@ -21,7 +21,7 @@ struct TF {
 }
 
 impl Stats {
-    pub fn new(words: &Vec<String>, file: &Path) -> Self {
+    pub fn new(words: &[String], file: &Path) -> Self {
         let mut term_frequency: HashMap<String, TF> = HashMap::new();
         let len = words.len();
 
@@ -29,7 +29,7 @@ impl Stats {
 
         words.iter().for_each(|w| {
             term_frequency
-                .entry(w.clone())
+                .entry(w.to_owned())
                 .and_modify(|counter| counter.freq += 1)
                 .or_insert(TF { freq: 1, per: 0.0 });
         });
@@ -110,7 +110,7 @@ impl Stats {
 
         match o {
             "Json" => self.write_json(file_name)?,
-            "Text" => self.write_text(file_name)?,
+            "Txt" => self.write_text(file_name)?,
             "Csv" => self.write_csv(file_name)?,
             _ => unreachable!(),
         }
@@ -204,7 +204,7 @@ pub fn find_words_in_file(file: &str) -> io::Result<Vec<String>> {
         .flat_map(|l| {
             let r: String = br.replace_all(&l, "").into();
             re.find_iter(&r)
-                .map(|w| w.as_str().to_owned().to_lowercase())
+                .map(|w| w.as_str().to_lowercase())
                 .collect::<Vec<String>>()
         })
         .collect())

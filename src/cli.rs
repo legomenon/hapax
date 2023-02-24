@@ -18,9 +18,12 @@ struct Cli {
     #[clap(default_value = "./")]
     #[arg(short, long)]
     path: String,
-    /// exclude junk words
+    /// skip removing junk words
     #[arg(short, long)]
     junk: bool,
+    /// skip words lemmanization
+    #[arg(short, long)]
+    lemma: bool,
 
     #[command(subcommand)]
     command: Commands,
@@ -47,7 +50,7 @@ enum Commands {
 #[derive(Debug)]
 enum Output {
     Json,
-    Text,
+    Txt,
     Csv,
 }
 
@@ -57,18 +60,21 @@ fn main() -> io::Result<()> {
     match cli.command {
         Commands::Tf { dir, file } => match (dir, file) {
             (_, Some(f)) => {
-                let words = find_words_in_file(&f)?;
-                let words = lemmanization(words)?;
+                let mut words = find_words_in_file(&f).unwrap_or(Vec::new());
+                if !cli.lemma {
+                    words = lemmanization(words)?;
+                }
+
                 let f = PathBuf::from(f);
                 if words.is_empty() {
                     println!(
-                        "{:<16}{} is empty ",
+                        "{:<16}{} is empty | can not be read",
                         "WARNING",
                         f.file_name()
                             .expect("file name is invalid")
                             .to_string_lossy()
                     );
-                    std::process::exit(0);
+                    std::process::exit(1);
                 }
                 println!(
                     "{:<14} {}",
@@ -83,7 +89,7 @@ fn main() -> io::Result<()> {
                     .output
                     .parse::<Output>()
                     .expect("can not parse cli command");
-                if cli.junk {
+                if !cli.junk {
                     st.exclude_junk("./junk_words.txt");
                 }
 
@@ -102,11 +108,15 @@ fn main() -> io::Result<()> {
                 println!("Parsing {} files:\n\n", files.len());
 
                 files.par_iter().for_each(|f| {
-                    let words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
-                    let words = lemmanization(words).unwrap_or(Vec::new());
+                    let mut words =
+                        find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+
+                    if !cli.lemma {
+                        words = lemmanization(words).unwrap_or(Vec::new());
+                    }
                     if words.is_empty() {
                         println!(
-                            "{:<16}{} is empty | can not read a file",
+                            "{:<16}{} is empty | can not be read",
                             "WARNING",
                             f.file_name()
                                 .expect("file name is invalid")
@@ -123,7 +133,7 @@ fn main() -> io::Result<()> {
                             .to_string_lossy()
                     );
                     let mut st = Stats::new(&words, f);
-                    if cli.junk {
+                    if !cli.junk {
                         st.exclude_junk("./junk_words.txt");
                     }
 
@@ -145,11 +155,15 @@ fn main() -> io::Result<()> {
             println!("PARSING {} FILES:\n", files.len());
             let st = Mutex::new(Stats::new_total());
             files.par_iter().for_each(|f| {
-                let words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
-                let words = lemmanization(words).unwrap_or(Vec::new());
+                let mut words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+
+                if !cli.lemma {
+                    words = lemmanization(words).unwrap_or(Vec::new());
+                }
+
                 if words.is_empty() {
                     println!(
-                        "{:<16}{} is empty | can not read a file",
+                        "{:<16}{} is empty | can not be read",
                         "WARNING",
                         f.file_name()
                             .expect("file name is invalid")
@@ -167,7 +181,7 @@ fn main() -> io::Result<()> {
                 st.lock().unwrap().extend(&words);
             });
             let mut st = st.lock().unwrap();
-            if cli.junk {
+            if !cli.junk {
                 st.exclude_junk("./junk_words.txt");
             }
             match st.write(&format!("{o:?}"), &cli.path) {
@@ -185,7 +199,7 @@ impl FromStr for Output {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "json" => Ok(Output::Json),
-            "text" => Ok(Output::Text),
+            "text" => Ok(Output::Txt),
             "csv" => Ok(Output::Csv),
             _ => Err("invalid output format".to_owned()),
         }
