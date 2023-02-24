@@ -19,14 +19,26 @@ hapax [OPTIONS] <COMMAND>
 TFA provides the following options and commands:
 ### Options:
 ```sh
+Commands:
+  tf    provides term frequency TF
+  tft   provides term frequency for all documents words comb
+  
+  help  Print this message or the help of the given subcommand(s)
   -o, --output <OUTPUT>  type of the output file: json/csv/text [default: json]
   -p, --path <PATH>      path to the output folder [default: ./]
-  -j, --junk             exclude junk words
+  -j, --junk             allow junk words 
+  -l, --lemma            skip lemmanization 
   -h, --help             Print help
   -V, --version          Print version
 ```
 ## Commands:
   ## tf    provides term frequency
+  ```sh
+  Options:
+  -f, --file <FILE>...  files for parsing
+  -d, --dir <DIR>       dir for parsing
+  -h, --help            Print help
+  ```
 
 To get the frequency of words in a text file, you can use the tf command followed by the path to the file. For example:
 
@@ -34,7 +46,7 @@ To get the frequency of words in a text file, you can use the tf command followe
 
 hapax tf -f /path/to/file.txt
 ```
-This will print the frequency of each word in the file to the console.
+This will output the frequency of each word in the file to path output [default: ./].
 
 You can also specify the output format and the output folder using the -o and -p options, respectively. For example:
 
@@ -44,13 +56,11 @@ hapax -o csv -p /output/folder/ tf -f /path/to/file.txt
 ```
 This will save the frequency of words in the file to a CSV file in the specified output folder.
 
-### tft    provides term frequency for all documents words combined
-
-To get the frequency of all words excluding junk words from all files in specified directory in one file , you can use the tft command followed by the path to the directory.  For example:
-
+## tft    provides term frequency for all words in directory combined in one output
 ```sh
-
-hapax -j tft -d /my_folder
+Options:
+  -d, --dir <DIR>  dir for parsing
+  -h, --help       Print help
 ```
 
 ## Output Formats:
@@ -126,7 +136,7 @@ that,109,1.079849415494353
 ```
 ## 10k film's subtitles files analysis: 
 ```sh
-hapax_cli -o text -j tft -d films/
+hapax_cli -o text tft -d films/
 ```
 ## 50 most popular words:
 
