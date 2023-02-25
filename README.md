@@ -139,6 +139,9 @@ that,109,1.079849415494353
 hapax_cli -o text tft -d films/
 ```
 ## 50 most popular words:
+```sh
+cat | head -n 53  ./result/total.stats.txt
+```
 
 total.stats.txt:
 ```
