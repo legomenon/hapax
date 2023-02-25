@@ -1,8 +1,7 @@
 use clap::{Parser, Subcommand};
-use hapax::{find_files_in_dir, find_words_in_file, lemmanization, Stats};
+use hapax::{exclude_junk, find_files_in_dir, find_words_in_file, lemmanization, Output, Stats};
 use std::io;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use rayon::prelude::*;
@@ -10,7 +9,7 @@ use rayon::prelude::*;
 #[derive(Parser, Clone)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// type of the output file: json/csv/text
+    /// type of the output file: json/csv/txt
     #[clap(default_value = "json")]
     #[arg(short, long)]
     output: String,
@@ -47,12 +46,6 @@ enum Commands {
         dir: String,
     },
 }
-#[derive(Debug)]
-enum Output {
-    Json,
-    Txt,
-    Csv,
-}
 
 fn main() -> io::Result<()> {
     let cli = Arc::new(Cli::parse());
@@ -79,12 +72,21 @@ fn main() -> io::Result<()> {
 
 fn process_files(files: &Vec<PathBuf>, cli: Arc<Cli>) {
     let cli = cli;
+    let o = cli
+        .output
+        .parse::<Output>()
+        .expect("can not parse cli command");
+
     println!("PARSING {} FILES:\n", files.len());
     files.par_iter().for_each(|f| {
         let mut words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
 
         if !cli.lemma {
             words = lemmanization(words).unwrap_or(Vec::new());
+        }
+
+        if !cli.junk {
+            words = exclude_junk(words).unwrap_or(Vec::new());
         }
         if words.is_empty() {
             println!(
@@ -104,16 +106,10 @@ fn process_files(files: &Vec<PathBuf>, cli: Arc<Cli>) {
                 .expect("file name is invalid")
                 .to_string_lossy()
         );
-        let mut st = Stats::new(&words, f);
-        if !cli.junk {
-            st.exclude_junk("./junk_words.txt");
-        }
-        let o = cli
-            .output
-            .parse::<Output>()
-            .expect("can not parse cli command");
 
-        match st.write(&format!("{o:?}"), &cli.path) {
+        let st = Stats::new(&words, f);
+
+        match st.write(o, &cli.path) {
             Ok(_) => println!("{:<15}{}", "OK", st.file_name),
             Err(e) => println!("{:<15}{}:{}", "ERROR", st.file_name, e),
         }
@@ -122,6 +118,10 @@ fn process_files(files: &Vec<PathBuf>, cli: Arc<Cli>) {
 
 fn process_files_total(files: &Vec<PathBuf>, cli: Arc<Cli>) {
     let cli = cli;
+    let o = cli
+        .output
+        .parse::<Output>()
+        .expect("can not parse cli command");
 
     println!("PARSING {} FILES:\n", files.len());
     let st = Mutex::new(Stats::new_total());
@@ -130,6 +130,9 @@ fn process_files_total(files: &Vec<PathBuf>, cli: Arc<Cli>) {
 
         if !cli.lemma {
             words = lemmanization(words).unwrap_or(Vec::new());
+        }
+        if !cli.junk {
+            words = exclude_junk(words).unwrap_or(Vec::new());
         }
 
         if words.is_empty() {
@@ -153,29 +156,9 @@ fn process_files_total(files: &Vec<PathBuf>, cli: Arc<Cli>) {
         st.lock().unwrap().extend(&words);
     });
 
-    let mut st = st.lock().unwrap();
-    if !cli.junk {
-        st.exclude_junk("./junk_words.txt");
-    }
-    let o = cli
-        .output
-        .parse::<Output>()
-        .expect("can not parse cli command");
-    match st.write(&format!("{o:?}"), &cli.path) {
+    let st = st.lock().unwrap();
+    match st.write(o, &cli.path) {
         Ok(_) => println!("\n\n{:<15}{}", "OK", st.file_name),
         Err(e) => println!("\n\n{:<15}{}:{}", "ERROR", st.file_name, e),
-    }
-}
-
-impl FromStr for Output {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "json" => Ok(Output::Json),
-            "text" => Ok(Output::Txt),
-            "csv" => Ok(Output::Csv),
-            _ => Err("invalid output format".to_owned()),
-        }
     }
 }
