@@ -1,5 +1,6 @@
 use serde::Serialize;
 use serde_json::to_string;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufWriter, Write};
@@ -9,11 +10,11 @@ use std::str::FromStr;
 // use rayon::prelude::*;
 
 #[derive(Serialize, Debug)]
-pub struct Stats {
-    pub file_name: String,
+pub struct Stats<'a> {
+    pub file_name: Cow<'a, str>,
     unique: usize,
     total: usize,
-    term_frequency: HashMap<String, (usize, f64)>,
+    term_frequency: HashMap<Cow<'a, str>, (usize, f64)>,
 }
 
 #[derive(Clone, Copy)]
@@ -23,16 +24,16 @@ pub enum Output {
     Csv,
 }
 
-impl Stats {
-    pub fn new(words: &[String], file: &Path) -> Self {
-        let mut term_frequency: HashMap<String, (usize, f64)> = HashMap::new();
+impl<'a> Stats<'a> {
+    pub fn new(words: &'a [String], file: &'a Path) -> Self {
+        let mut term_frequency: HashMap<Cow<'a, str>, (usize, f64)> = HashMap::new();
         let len = words.len();
 
         let mut total: usize = 0;
 
         words.iter().for_each(|w| {
             term_frequency
-                .entry(w.to_owned())
+                .entry(Cow::Borrowed(w))
                 .and_modify(|counter| counter.0 += 1)
                 .or_insert((1, 0.0));
         });
@@ -55,24 +56,24 @@ impl Stats {
 
         Self {
             term_frequency,
-            file_name,
+            file_name: Cow::Owned(file_name),
             unique,
             total,
         }
     }
     pub fn new_total() -> Self {
         Self {
-            file_name: "total".to_owned(),
+            file_name: Cow::Borrowed("total"),
             unique: 0,
             term_frequency: HashMap::new(),
             total: 0,
         }
     }
 
-    pub fn extend(&mut self, words: &[String]) {
+    pub fn extend(&mut self, words: &'a [String]) {
         words.iter().for_each(|w| {
             self.term_frequency
-                .entry(w.clone())
+                .entry(Cow::Borrowed(w))
                 .and_modify(|counter| counter.0 += 1)
                 .or_insert((1, 0.0));
         });
@@ -112,7 +113,7 @@ impl Stats {
         let file = File::create(file_name + ".stats.txt")?;
         let mut file = BufWriter::new(file);
 
-        let mut v: Vec<(&String, &(usize, f64))> = self.term_frequency.iter().collect();
+        let mut v: Vec<(&Cow<str>, &(usize, f64))> = self.term_frequency.iter().collect();
         v.sort_unstable_by(|a, b| b.1 .0.cmp(&a.1 .0));
 
         let data = format!(
@@ -140,7 +141,7 @@ impl Stats {
         let file = File::create(file_name + ".stats.csv")?;
         let mut file = BufWriter::new(file);
 
-        let mut v: Vec<(&String, &(usize, f64))> = self.term_frequency.iter().collect();
+        let mut v: Vec<(&Cow<str>, &(usize, f64))> = self.term_frequency.iter().collect();
         v.sort_unstable_by(|a, b| b.1 .0.cmp(&a.1 .0));
 
         let data = format!(

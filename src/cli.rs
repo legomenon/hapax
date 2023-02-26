@@ -131,21 +131,23 @@ fn process_files_total(files: &Vec<PathBuf>, cli: Arc<Cli>) {
 
     println!("PARSING {} FILES:\n", files.len());
 
+    let words: Mutex<Vec<String>> = Mutex::new(Vec::new());
     let st = Mutex::new(Stats::new_total());
     let junk = Arc::new(preload_junk().unwrap());
     let lemma = Arc::new(preload_lemma().unwrap());
 
     files.par_iter().for_each(|f| {
-        let mut words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+        let mut w = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+
         if !cli.lemma {
-            words = lemmanization(words, &lemma).unwrap_or(Vec::new());
+            w = lemmanization(w, &lemma).unwrap_or(Vec::new());
         }
 
         if !cli.junk {
-            words = exclude_junk(&words, &junk).unwrap_or(Vec::new());
+            w = exclude_junk(&w, &junk).unwrap_or(Vec::new());
         }
 
-        if words.is_empty() {
+        if w.is_empty() {
             println!(
                 "{:<16}{} is empty | could not be read",
                 "WARNING",
@@ -163,12 +165,17 @@ fn process_files_total(files: &Vec<PathBuf>, cli: Arc<Cli>) {
                 .expect("file name is invalid")
                 .to_string_lossy()
         );
-        st.lock().unwrap().extend(&words);
+        words.lock().unwrap().append(&mut w);
     });
 
-    let st = st.lock().unwrap();
+    let words = words.lock().unwrap();
+    let mut st = st.lock().unwrap();
+
+    st.extend(words.as_slice());
+
     match st.write(o, &cli.path) {
         Ok(_) => println!("\n\n{:<15}{}", "OK", st.file_name),
         Err(e) => println!("\n\n{:<15}{}:{}", "ERROR", st.file_name, e),
     }
+    drop(st);
 }
