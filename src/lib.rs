@@ -6,8 +6,9 @@ use std::fs::{self, File};
 use std::io::{self, BufRead, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 
-// use rayon::prelude::*;
+use rayon::prelude::*;
 
 #[derive(Serialize, Debug)]
 pub struct Stats<'a> {
@@ -22,6 +23,13 @@ pub enum Output {
     Json,
     Txt,
     Csv,
+}
+
+pub struct Options {
+    pub output_type: Output,
+    pub output_path: PathBuf,
+    pub skip_junk_words: bool,
+    pub skip_lemmanization: bool,
 }
 
 impl<'a> Stats<'a> {
@@ -92,8 +100,8 @@ impl<'a> Stats<'a> {
         });
     }
 
-    pub fn write(&self, o: Output, p: &str) -> io::Result<()> {
-        let dir = p.to_string() + "/result/";
+    pub fn write(&self, o: Output, p: &Path) -> io::Result<()> {
+        let dir = p.display().to_string() + "/result/";
         let path = std::path::Path::new(&dir);
 
         if !path.exists() {
@@ -254,6 +262,100 @@ pub fn preload_junk() -> io::Result<HashSet<String>> {
         let _ = j_set.insert(w);
     });
     Ok(j_set)
+}
+
+pub fn process_files(files: &Vec<PathBuf>, ops: Arc<Options>) {
+    println!("PARSING {} FILES:\n", files.len());
+    let junk = Arc::new(preload_junk().unwrap());
+    let lemma = Arc::new(preload_lemma().unwrap());
+
+    files.par_iter().for_each(|f| {
+        let mut words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+
+        if !ops.skip_lemmanization {
+            words = lemmanization(words, &lemma).unwrap_or(Vec::new());
+        }
+
+        if !ops.skip_junk_words {
+            words = exclude_junk(&words, &junk).unwrap_or(Vec::new());
+        }
+        if words.is_empty() {
+            println!(
+                "{:<15}{} not exist | could not be read",
+                "WARNING",
+                f.file_name()
+                    .expect("file name is invalid")
+                    .to_string_lossy()
+            );
+            return;
+        }
+
+        println!(
+            "{:<14} {}",
+            "PARSING",
+            f.file_name()
+                .expect("file name is invalid")
+                .to_string_lossy()
+        );
+
+        let st = Stats::new(&words, f);
+
+        match st.write(ops.output_type, &ops.output_path) {
+            Ok(_) => println!("{:<15}{}", "OK", st.file_name),
+            Err(e) => println!("{:<15}{}:{}", "ERROR", st.file_name, e),
+        }
+    });
+}
+
+pub fn process_files_total(files: &Vec<PathBuf>, ops: Arc<Options>) {
+    println!("PARSING {} FILES:\n", files.len());
+
+    let words: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    let st = Mutex::new(Stats::new_total());
+    let junk = Arc::new(preload_junk().unwrap());
+    let lemma = Arc::new(preload_lemma().unwrap());
+
+    files.par_iter().for_each(|f| {
+        let mut w = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+
+        if !ops.skip_lemmanization {
+            w = lemmanization(w, &lemma).unwrap_or(Vec::new());
+        }
+
+        if !ops.skip_junk_words {
+            w = exclude_junk(&w, &junk).unwrap_or(Vec::new());
+        }
+
+        if w.is_empty() {
+            println!(
+                "{:<16}{} is empty | could not be read",
+                "WARNING",
+                f.file_name()
+                    .expect("file name is invalid")
+                    .to_string_lossy()
+            );
+            return;
+        }
+
+        println!(
+            "{:<15} {}",
+            "PARSING",
+            f.file_name()
+                .expect("file name is invalid")
+                .to_string_lossy()
+        );
+        words.lock().unwrap().append(&mut w);
+    });
+
+    let words = words.lock().unwrap();
+    let mut st = st.lock().unwrap();
+
+    st.extend(words.as_slice());
+
+    match st.write(ops.output_type, &ops.output_path) {
+        Ok(_) => println!("\n\n{:<15}{}", "OK", st.file_name),
+        Err(e) => println!("\n\n{:<15}{}:{}", "ERROR", st.file_name, e),
+    }
 }
 
 impl FromStr for Output {
