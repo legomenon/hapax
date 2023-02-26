@@ -656,6 +656,8 @@ r
 s
 t
 u
+um
+uh
 uucp
 w
 x

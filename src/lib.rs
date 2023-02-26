@@ -201,42 +201,58 @@ pub fn find_words_in_file(file: &str) -> io::Result<Vec<String>> {
         .collect())
 }
 
-pub fn lemmanization(v: Vec<String>) -> io::Result<Vec<String>> {
-    let file = fs::read_to_string("./lemmas.txt")?;
-    let l = file
-        .split('\n')
-        .map(|l| {
-            l.split_whitespace()
-                .map(|w| w.to_owned())
-                .collect::<Vec<_>>()
-        })
-        .map(|w: Vec<String>| {
-            let word = w[0].clone();
-            let lemmas: Vec<String> = w[1..].to_vec();
-            (word, lemmas)
-        })
-        .collect::<Vec<_>>();
+pub fn lemmanization(v: Vec<String>, lemma: &HashMap<String, String>) -> io::Result<Vec<String>> {
+    let new_v: Vec<String> = v
+        .iter()
+        .map(|w| lemma.get(w).unwrap_or(w).to_owned())
+        .collect();
 
-    let mut lemma: HashMap<String, String> = HashMap::new();
-    l.into_iter().for_each(|w| {
-        w.1.into_iter().for_each(|l| {
-            lemma.insert(l, w.0.clone());
-        })
-    });
-
-    let mut new_v: Vec<String> = Vec::new();
-    v.into_iter().for_each(|w| match lemma.get(&w) {
-        Some(l) => new_v.push(l.to_owned()),
-        None => new_v.push(w),
-    });
     Ok(new_v)
 }
 
-pub fn exclude_junk(v: Vec<String>) -> io::Result<Vec<String>> {
-    let j_words = fs::read_to_string("./junk_words.txt")?;
-    let j_set: HashSet<String> = j_words.split('\n').map(|w| w.to_lowercase()).collect();
-    let new_v: Vec<String> = v.into_iter().filter(|w| !j_set.contains(w)).collect();
+pub fn exclude_junk(v: &[String], h: &HashSet<String>) -> io::Result<Vec<String>> {
+    let new_v: Vec<String> = v
+        .iter()
+        .filter(|&w| !h.contains(&w.to_lowercase()))
+        .cloned()
+        .collect();
+
     Ok(new_v)
+}
+
+pub fn preload_lemma() -> io::Result<HashMap<String, String>> {
+    let file = read_lines("./lemmas.txt")?;
+
+    let l: Vec<(String, Vec<String>)> = file
+        .filter_map(|line| line.ok())
+        .map(|l| {
+            let parts: Vec<String> = l.split_whitespace().map(|w| w.to_owned()).collect();
+            let word = parts[0].clone();
+            let lemmas = parts[1..].to_vec();
+            (word, lemmas)
+        })
+        .collect();
+
+    let mut lemma: HashMap<String, String> = HashMap::new();
+
+    l.into_iter().for_each(|(word, vec)| {
+        vec.into_iter().for_each(|l| {
+            let _ = lemma.insert(l, word.clone());
+        });
+    });
+
+    Ok(lemma)
+}
+
+pub fn preload_junk() -> io::Result<HashSet<String>> {
+    let j_words = read_lines("./junk_words.txt")?;
+
+    let mut j_set: HashSet<String> = HashSet::new();
+    j_set.reserve(1000);
+    j_words.filter_map(|line| line.ok()).for_each(|w| {
+        let _ = j_set.insert(w);
+    });
+    Ok(j_set)
 }
 
 impl FromStr for Output {

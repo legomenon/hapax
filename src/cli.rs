@@ -1,5 +1,8 @@
 use clap::{Parser, Subcommand};
-use hapax::{exclude_junk, find_files_in_dir, find_words_in_file, lemmanization, Output, Stats};
+use hapax::{
+    exclude_junk, find_files_in_dir, find_words_in_file, lemmanization, preload_junk,
+    preload_lemma, Output, Stats,
+};
 use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -78,15 +81,18 @@ fn process_files(files: &Vec<PathBuf>, cli: Arc<Cli>) {
         .expect("can not parse cli command");
 
     println!("PARSING {} FILES:\n", files.len());
+    let junk = Arc::new(preload_junk().unwrap());
+    let lemma = Arc::new(preload_lemma().unwrap());
+
     files.par_iter().for_each(|f| {
         let mut words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
 
         if !cli.lemma {
-            words = lemmanization(words).unwrap_or(Vec::new());
+            words = lemmanization(words, &lemma).unwrap_or(Vec::new());
         }
 
         if !cli.junk {
-            words = exclude_junk(words).unwrap_or(Vec::new());
+            words = exclude_junk(&words, &junk).unwrap_or(Vec::new());
         }
         if words.is_empty() {
             println!(
@@ -124,15 +130,19 @@ fn process_files_total(files: &Vec<PathBuf>, cli: Arc<Cli>) {
         .expect("can not parse cli command");
 
     println!("PARSING {} FILES:\n", files.len());
+
     let st = Mutex::new(Stats::new_total());
+    let junk = Arc::new(preload_junk().unwrap());
+    let lemma = Arc::new(preload_lemma().unwrap());
+
     files.par_iter().for_each(|f| {
         let mut words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
-
         if !cli.lemma {
-            words = lemmanization(words).unwrap_or(Vec::new());
+            words = lemmanization(words, &lemma).unwrap_or(Vec::new());
         }
+
         if !cli.junk {
-            words = exclude_junk(words).unwrap_or(Vec::new());
+            words = exclude_junk(&words, &junk).unwrap_or(Vec::new());
         }
 
         if words.is_empty() {
