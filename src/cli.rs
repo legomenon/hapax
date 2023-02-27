@@ -1,6 +1,9 @@
 use clap::{Parser, Subcommand};
+use env_logger::fmt::Color;
+use env_logger::Env;
 use hapax::helpers::{find_files_in_dir, process_files, process_files_total, Options, Output};
 use std::io;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -46,6 +49,21 @@ enum Commands {
 }
 
 fn main() -> io::Result<()> {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info"))
+        .format(|buf, record| {
+            let mut style = buf.style();
+            let color = match record.level() {
+                log::Level::Error => Color::Red,
+                log::Level::Warn => Color::Yellow,
+                log::Level::Info => Color::Green,
+                log::Level::Debug => Color::Blue,
+                log::Level::Trace => Color::Magenta,
+            };
+            style.set_color(color).set_bold(true);
+            writeln!(buf, "[{}] {}", style.value(record.level()), record.args())
+        })
+        .init();
+
     let cli = Arc::new(Cli::parse());
     let o = cli
         .output

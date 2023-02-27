@@ -1,3 +1,4 @@
+use log::{error, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{self, BufRead};
@@ -9,7 +10,7 @@ use crate::Stats;
 
 use rayon::prelude::*;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Output {
     Json,
     Txt,
@@ -111,7 +112,7 @@ pub fn preload_junk() -> io::Result<HashSet<String>> {
 }
 
 pub fn process_files(files: &Vec<PathBuf>, ops: Arc<Options>) {
-    println!("PARSING {} FILES:\n", files.len());
+    info!("parsing {} files", files.len());
     let junk = Arc::new(preload_junk().unwrap());
     let lemma = Arc::new(preload_lemma().unwrap());
 
@@ -126,9 +127,8 @@ pub fn process_files(files: &Vec<PathBuf>, ops: Arc<Options>) {
             words = exclude_junk(&words, &junk).unwrap_or(Vec::new());
         }
         if words.is_empty() {
-            println!(
-                "{:<15}{} not exist | could not be read",
-                "WARNING",
+            warn!(
+                "{}: is empty or could not be read",
                 f.file_name()
                     .expect("file name is invalid")
                     .to_string_lossy()
@@ -136,9 +136,8 @@ pub fn process_files(files: &Vec<PathBuf>, ops: Arc<Options>) {
             return;
         }
 
-        println!(
-            "{:<14} {}",
-            "PARSING",
+        info!(
+            "{}",
             f.file_name()
                 .expect("file name is invalid")
                 .to_string_lossy()
@@ -146,16 +145,14 @@ pub fn process_files(files: &Vec<PathBuf>, ops: Arc<Options>) {
 
         let st = Stats::new(&words, f);
 
-        match st.write(ops.output_type, &ops.output_path) {
-            Ok(_) => println!("{:<15}{}", "OK", st.file_name),
-            Err(e) => println!("{:<15}{}:{}", "ERROR", st.file_name, e),
+        if let Err(e) = st.write(ops.output_type, &ops.output_path) {
+            error!("{}: {}", st.file_name, e);
         }
     });
 }
 
 pub fn process_files_total(files: &Vec<PathBuf>, ops: Arc<Options>) {
-    println!("PARSING {} FILES:\n", files.len());
-
+    info!("parsing {} files:", files.len());
     let words: Mutex<Vec<String>> = Mutex::new(Vec::new());
     let st = Mutex::new(Stats::new_total());
     let junk = Arc::new(preload_junk().unwrap());
@@ -173,9 +170,8 @@ pub fn process_files_total(files: &Vec<PathBuf>, ops: Arc<Options>) {
         }
 
         if w.is_empty() {
-            println!(
-                "{:<16}{} is empty | could not be read",
-                "WARNING",
+            warn!(
+                "{}: is empty or could not be read",
                 f.file_name()
                     .expect("file name is invalid")
                     .to_string_lossy()
@@ -183,13 +179,13 @@ pub fn process_files_total(files: &Vec<PathBuf>, ops: Arc<Options>) {
             return;
         }
 
-        println!(
-            "{:<15} {}",
-            "PARSING",
+        info!(
+            "{}",
             f.file_name()
                 .expect("file name is invalid")
                 .to_string_lossy()
         );
+
         words.lock().unwrap().append(&mut w);
     });
 
@@ -198,9 +194,8 @@ pub fn process_files_total(files: &Vec<PathBuf>, ops: Arc<Options>) {
 
     st.extend(words.as_slice());
 
-    match st.write(ops.output_type, &ops.output_path) {
-        Ok(_) => println!("\n\n{:<15}{}", "OK", st.file_name),
-        Err(e) => println!("\n\n{:<15}{}:{}", "ERROR", st.file_name, e),
+    if let Err(e) = st.write(ops.output_type, &ops.output_path) {
+        error!("{}: {}", st.file_name, e);
     }
 }
 
