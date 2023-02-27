@@ -197,3 +197,8 @@ start                  44013                  0.21%
 listen                 43242                  0.21%
 ...
 ```
+## Lemmatization and stop words(junk words)
+- List of lemmas was sourced from [here](https://github.com/skywind3000/lemma.en)
+84466 words
+- List of stop words was sourced from [here](https://countwordsfree.com/stopwords)
+853 words
