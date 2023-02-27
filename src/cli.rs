@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use hapax::{find_files_in_dir, process_files, process_files_total, Options, Output};
+use hapax::helpers::{find_files_in_dir, process_files, process_files_total, Options, Output};
 use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,7 +18,7 @@ struct Cli {
     /// skip junk words
     #[arg(short, long)]
     junk: bool,
-    /// skip lemmanization
+    /// skip lemmatization
     #[arg(short, long)]
     lemma: bool,
 
