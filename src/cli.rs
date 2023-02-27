@@ -1,4 +1,5 @@
-use crate::helpers::{find_files_in_dir, process_files, process_files_total, Options, Output};
+use crate::helpers::{find_files_in_dir, Options, Output};
+use crate::process;
 use clap::{Parser, Subcommand};
 use env_logger::fmt::Color;
 use env_logger::Env;
@@ -81,23 +82,27 @@ pub fn run() -> io::Result<()> {
         skip_junk_words: cli.junk,
         skip_lemmanization: cli.lemma,
     };
+
     let ops = Arc::new(ops);
 
     match &cli.command {
         Commands::Tf { dir, file } => match (dir, file) {
             (_, Some(f)) => {
                 let files: Vec<PathBuf> = f.iter().map(PathBuf::from).collect();
-                process_files(&files, ops)
+                process::multi_threaded::for_each(&files, ops)
             }
             (Some(d), _) => {
                 let files = find_files_in_dir(d)?;
-                process_files(&files, ops)
+                process::multi_threaded::for_each(&files, ops)
             }
-            (None, None) => eprintln!("Provide file path or directory"),
+            (None, None) => {
+                error!("Provide file path or directory");
+                std::process::exit(2);
+            }
         },
         Commands::Tft { dir } => {
             let files = find_files_in_dir(dir)?;
-            process_files_total(&files, ops);
+            process::multi_threaded::total(&files, ops);
         }
     }
     Ok(())

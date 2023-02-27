@@ -8,6 +8,7 @@ use std::path::Path;
 
 pub mod cli;
 pub mod helpers;
+pub mod process;
 use crate::helpers::Output;
 
 #[derive(Serialize, Debug)]
