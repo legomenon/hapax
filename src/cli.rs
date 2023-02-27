@@ -1,7 +1,8 @@
+use crate::helpers::{find_files_in_dir, process_files, process_files_total, Options, Output};
 use clap::{Parser, Subcommand};
 use env_logger::fmt::Color;
 use env_logger::Env;
-use hapax::helpers::{find_files_in_dir, process_files, process_files_total, Options, Output};
+use log::error;
 use std::io;
 use std::io::Write;
 use std::path::PathBuf;
@@ -48,7 +49,7 @@ enum Commands {
     },
 }
 
-fn main() -> io::Result<()> {
+pub fn run() -> io::Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info"))
         .format(|buf, record| {
             let mut style = buf.style();
@@ -72,6 +73,10 @@ fn main() -> io::Result<()> {
 
     let mut path = PathBuf::new();
     path.push(&cli.path);
+    if !path.exists() {
+        error!("path is not exist");
+        std::process::exit(2);
+    }
 
     let ops = Options {
         output_type: o,

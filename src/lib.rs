@@ -6,6 +6,7 @@ use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
+pub mod cli;
 pub mod helpers;
 use crate::helpers::Output;
 
