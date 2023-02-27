@@ -1,7 +1,7 @@
 use log::{error, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
@@ -200,14 +200,14 @@ pub fn process_files_total(files: &Vec<PathBuf>, ops: Arc<Options>) {
 }
 
 impl FromStr for Output {
-    type Err = &'static str;
+    type Err = io::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "json" => Ok(Output::Json),
             "txt" => Ok(Output::Txt),
             "csv" => Ok(Output::Csv),
-            _ => Err("invalid output format"),
+            _ => Err(Error::new(ErrorKind::Other, "invalid output option")),
         }
     }
 }

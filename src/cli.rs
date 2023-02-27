@@ -66,10 +66,7 @@ pub fn run() -> io::Result<()> {
         .init();
 
     let cli = Arc::new(Cli::parse());
-    let o = cli
-        .output
-        .parse::<Output>()
-        .expect("can not parse cli command");
+    let o = cli.output.parse::<Output>()?;
 
     let mut path = PathBuf::new();
     path.push(&cli.path);
