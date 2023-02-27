@@ -202,3 +202,7 @@ listen                 43242                  0.21%
 84466 words
 - List of stop words was sourced from [here](https://countwordsfree.com/stopwords)
 853 words
+
+## License
+
+Licensed under the MIT License
