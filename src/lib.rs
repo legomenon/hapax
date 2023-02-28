@@ -1,7 +1,8 @@
+use rustc_hash::FxHashMap;
 use serde::Serialize;
 use serde_json::to_string;
 use std::borrow::Cow;
-use std::collections::HashMap;
+
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
@@ -16,12 +17,12 @@ pub struct Stats<'a> {
     pub file_name: Cow<'a, str>,
     unique: usize,
     total: usize,
-    term_frequency: HashMap<Cow<'a, str>, (usize, f64)>,
+    term_frequency: FxHashMap<Cow<'a, str>, (usize, f64)>,
 }
 
 impl<'a> Stats<'a> {
     pub fn new(words: &'a [String], file: &'a Path) -> Self {
-        let mut term_frequency: HashMap<Cow<'a, str>, (usize, f64)> = HashMap::new();
+        let mut term_frequency: FxHashMap<Cow<'a, str>, (usize, f64)> = FxHashMap::default();
         let len = words.len();
 
         let mut total: usize = 0;
@@ -60,7 +61,7 @@ impl<'a> Stats<'a> {
         Self {
             file_name: Cow::Borrowed("total"),
             unique: 0,
-            term_frequency: HashMap::new(),
+            term_frequency: FxHashMap::default(),
             total: 0,
         }
     }

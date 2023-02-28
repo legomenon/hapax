@@ -1,8 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{self, BufRead, Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+
+use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Output {
@@ -51,7 +53,7 @@ pub fn find_words_in_file(file: &str) -> io::Result<Vec<String>> {
         .collect())
 }
 
-pub fn lemmatization(v: Vec<String>, lemma: &HashMap<String, String>) -> io::Result<Vec<String>> {
+pub fn lemmatization(v: &[String], lemma: &FxHashMap<String, String>) -> io::Result<Vec<String>> {
     let new_v: Vec<String> = v
         .iter()
         .map(|w| lemma.get(w).unwrap_or(w).to_owned())
@@ -70,7 +72,7 @@ pub fn exclude_junk(v: &[String], h: &HashSet<String>) -> io::Result<Vec<String>
     Ok(new_v)
 }
 
-pub fn preload_lemma() -> io::Result<HashMap<String, String>> {
+pub fn preload_lemma() -> io::Result<FxHashMap<String, String>> {
     let file = read_lines("./lemmatization")?;
 
     let l: Vec<(String, Vec<String>)> = file
@@ -82,8 +84,8 @@ pub fn preload_lemma() -> io::Result<HashMap<String, String>> {
             (word, lemmas)
         })
         .collect();
-
-    let mut lemma: HashMap<String, String> = HashMap::new();
+    // let hasher: FxHasher = FxHasher::default();
+    let mut lemma: FxHashMap<String, String> = FxHashMap::default();
 
     l.into_iter().for_each(|(word, vec)| {
         vec.into_iter().for_each(|l| {
