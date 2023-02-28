@@ -59,8 +59,12 @@ pub mod multi_threaded {
     };
     pub fn for_each(files: &Vec<PathBuf>, ops: Arc<Options>) {
         info!("parsing {} files", files.len());
-        let junk = Arc::new(preload_junk().unwrap());
-        let lemma = Arc::new(preload_lemma().unwrap());
+
+        let junk =
+            Arc::new(preload_junk(ops.skip_junk_words).expect("could not preload junk words list"));
+        let lemma = Arc::new(
+            preload_lemma(ops.skip_lemmanization).expect("could not preload lemmatization list"),
+        );
 
         files.par_iter().for_each(|f| {
             let words = match process::file(f, &ops, &lemma, &junk) {
@@ -80,8 +84,12 @@ pub mod multi_threaded {
         info!("parsing {} files:", files.len());
         let words: Mutex<Vec<String>> = Mutex::new(Vec::new());
         let st = Mutex::new(Stats::new_total());
-        let junk = Arc::new(preload_junk().unwrap());
-        let lemma = Arc::new(preload_lemma().unwrap());
+
+        let junk =
+            Arc::new(preload_junk(ops.skip_junk_words).expect("could not preload junk words list"));
+        let lemma = Arc::new(
+            preload_lemma(ops.skip_lemmanization).expect("could not preload lemmatization list"),
+        );
 
         files.par_iter().for_each(|f| {
             let mut w = match process::file(f, &ops, &lemma, &junk) {
@@ -114,8 +122,8 @@ pub mod single_threaded {
     };
     pub fn for_each(files: &Vec<PathBuf>, ops: Options) {
         info!("parsing {} files", files.len());
-        let junk = preload_junk().unwrap();
-        let lemma = preload_lemma().unwrap();
+        let junk = preload_junk(ops.skip_junk_words).unwrap();
+        let lemma = preload_lemma(ops.skip_lemmanization).unwrap();
 
         files.iter().for_each(|f| {
             let words = match process::file(f, &ops, &lemma, &junk) {
@@ -133,8 +141,9 @@ pub mod single_threaded {
         info!("parsing {} files:", files.len());
         let mut words: Vec<String> = Vec::new();
         let mut st = Stats::new_total();
-        let junk = preload_junk().unwrap();
-        let lemma = preload_lemma().unwrap();
+
+        let junk = preload_junk(ops.skip_junk_words).unwrap();
+        let lemma = preload_lemma(ops.skip_lemmanization).unwrap();
 
         files.iter().for_each(|f| {
             let mut w = match process::file(f, &ops, &lemma, &junk) {

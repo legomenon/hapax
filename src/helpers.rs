@@ -72,7 +72,10 @@ pub fn exclude_junk(v: &[String], h: &HashSet<String>) -> io::Result<Vec<String>
     Ok(new_v)
 }
 
-pub fn preload_lemma() -> io::Result<FxHashMap<String, String>> {
+pub fn preload_lemma(preload: bool) -> io::Result<FxHashMap<String, String>> {
+    if preload {
+        return Ok(FxHashMap::<String, String>::default());
+    }
     let file = read_lines("./lemmatization")?;
 
     let l: Vec<(String, Vec<String>)> = file
@@ -84,7 +87,7 @@ pub fn preload_lemma() -> io::Result<FxHashMap<String, String>> {
             (word, lemmas)
         })
         .collect();
-    // let hasher: FxHasher = FxHasher::default();
+
     let mut lemma: FxHashMap<String, String> = FxHashMap::default();
 
     l.into_iter().for_each(|(word, vec)| {
@@ -96,7 +99,11 @@ pub fn preload_lemma() -> io::Result<FxHashMap<String, String>> {
     Ok(lemma)
 }
 
-pub fn preload_junk() -> io::Result<HashSet<String>> {
+pub fn preload_junk(preload: bool) -> io::Result<HashSet<String>> {
+    if preload {
+        return Ok(HashSet::<String>::new());
+    }
+
     let j_words = read_lines("./junk_words")?;
 
     let mut j_set: HashSet<String> = HashSet::new();
