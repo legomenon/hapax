@@ -12,18 +12,22 @@ use std::sync::Arc;
 #[derive(Parser, Clone)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// type of the output file: json/csv/txt
+    /// type of the output file: [json|csv|txt]
     #[clap(default_value = "json")]
     #[arg(short, long)]
     output: String,
-    /// path to the output folder
+    /// path to the folder where result will be saved
     #[clap(default_value = "./")]
     #[arg(short, long)]
     path: String,
-    /// skip junk words
+    /// log filter [info|warn|error]
+    #[clap(default_value = "info")]
+    #[arg(short, long)]
+    log: String,
+    /// if set skip junk words
     #[arg(short, long)]
     junk: bool,
-    /// skip lemmatization
+    /// if set skip lemmatization
     #[arg(short, long)]
     lemma: bool,
 
@@ -51,22 +55,21 @@ enum Commands {
 }
 
 pub fn run() -> io::Result<()> {
-    env_logger::Builder::from_env(Env::default().default_filter_or("info"))
+    let cli = Cli::parse();
+    env_logger::Builder::from_env(Env::default().default_filter_or(cli.log))
         .format(|buf, record| {
             let mut style = buf.style();
             let color = match record.level() {
                 log::Level::Error => Color::Red,
                 log::Level::Warn => Color::Yellow,
                 log::Level::Info => Color::Green,
-                log::Level::Debug => Color::Blue,
-                log::Level::Trace => Color::Magenta,
+                _ => Color::White,
             };
             style.set_color(color).set_bold(true);
-            writeln!(buf, "[{}] {}", style.value(record.level()), record.args())
+            writeln!(buf, "{}: {}", style.value(record.level()), record.args())
         })
         .init();
 
-    let cli = Arc::new(Cli::parse());
     let o = cli.output.parse::<Output>()?;
 
     let mut path = PathBuf::new();
