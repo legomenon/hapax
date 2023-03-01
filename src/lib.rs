@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub mod cli;
 pub mod helpers;
@@ -87,13 +87,13 @@ impl<'a> Stats<'a> {
     }
 
     pub fn write(&self, o: Output, p: &Path) -> io::Result<()> {
-        let dir = p.display().to_string() + "/result/";
+        let dir = p.join("result");
         let path = std::path::Path::new(&dir);
 
         if !path.exists() {
             fs::create_dir(&dir)?;
         }
-        let file_name = dir + "/" + &self.file_name;
+        let file_name = dir.join(self.file_name.as_ref());
 
         match o {
             Output::Json => self.write_json(file_name)?,
@@ -103,8 +103,9 @@ impl<'a> Stats<'a> {
         Ok(())
     }
 
-    fn write_txt(&self, file_name: String) -> io::Result<()> {
-        let file = File::create(file_name + ".stats.txt")?;
+    fn write_txt(&self, file_name: PathBuf) -> io::Result<()> {
+        let file_name = format!("{}{}", file_name.display(), ".stats.txt");
+        let file = File::create(file_name)?;
         let mut file = BufWriter::new(file);
 
         let mut v: Vec<(&&'a str, &(usize, f64))> = self.term_frequency.iter().collect();
@@ -131,8 +132,9 @@ impl<'a> Stats<'a> {
         Ok(())
     }
 
-    fn write_csv(&self, file_name: String) -> io::Result<()> {
-        let file = File::create(file_name + ".stats.csv")?;
+    fn write_csv(&self, file_name: PathBuf) -> io::Result<()> {
+        let file_name = format!("{}{}", file_name.display(), ".stats.csv");
+        let file = File::create(file_name)?;
         let mut file = BufWriter::new(file);
 
         let mut v: Vec<(&&'a str, &(usize, f64))> = self.term_frequency.iter().collect();
@@ -153,8 +155,9 @@ impl<'a> Stats<'a> {
         Ok(())
     }
 
-    fn write_json(&self, file_name: String) -> io::Result<()> {
-        let file = File::create(file_name + ".stats.json")?;
+    fn write_json(&self, file_name: PathBuf) -> io::Result<()> {
+        let file_name = format!("{}{}", file_name.display(), ".stats.json");
+        let file = File::create(file_name)?;
         let file = BufWriter::new(file);
         to_writer(file, self)?;
         Ok(())
