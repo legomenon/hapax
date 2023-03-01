@@ -1,8 +1,9 @@
 use rustc_hash::FxHashMap;
 use serde::Serialize;
-use serde_json::to_string;
-use std::borrow::Cow;
+use serde_json::to_writer;
 
+use std::borrow::Cow;
+use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
@@ -17,19 +18,19 @@ pub struct Stats<'a> {
     pub file_name: Cow<'a, str>,
     unique: usize,
     total: usize,
-    term_frequency: FxHashMap<Cow<'a, str>, (usize, f64)>,
+    term_frequency: FxHashMap<&'a str, (usize, f64)>,
 }
 
 impl<'a> Stats<'a> {
     pub fn new(words: &'a [String], file: &'a Path) -> Self {
-        let mut term_frequency: FxHashMap<Cow<'a, str>, (usize, f64)> = FxHashMap::default();
+        let mut term_frequency: FxHashMap<&'a str, (usize, f64)> = FxHashMap::default();
         let len = words.len();
 
         let mut total: usize = 0;
 
         words.iter().for_each(|w| {
             term_frequency
-                .entry(Cow::Borrowed(w))
+                .entry(w)
                 .and_modify(|counter| counter.0 += 1)
                 .or_insert((1, 0.0));
         });
@@ -40,19 +41,16 @@ impl<'a> Stats<'a> {
             v.1 = per;
         });
 
-        let mut f = file.to_path_buf();
-        f.pop();
         let file_name = file
-            .display()
-            .to_string()
-            .replace(&f.display().to_string(), "")
-            .replace('/', "");
+            .file_name()
+            .unwrap_or(OsStr::new(file))
+            .to_string_lossy();
 
         let unique = term_frequency.len();
 
         Self {
             term_frequency,
-            file_name: Cow::Owned(file_name),
+            file_name,
             unique,
             total,
         }
@@ -69,7 +67,7 @@ impl<'a> Stats<'a> {
     pub fn extend(&mut self, words: &'a [String]) {
         words.iter().for_each(|w| {
             self.term_frequency
-                .entry(Cow::Borrowed(w))
+                .entry(w)
                 .and_modify(|counter| counter.0 += 1)
                 .or_insert((1, 0.0));
         });
@@ -109,7 +107,7 @@ impl<'a> Stats<'a> {
         let file = File::create(file_name + ".stats.txt")?;
         let mut file = BufWriter::new(file);
 
-        let mut v: Vec<(&Cow<str>, &(usize, f64))> = self.term_frequency.iter().collect();
+        let mut v: Vec<(&&'a str, &(usize, f64))> = self.term_frequency.iter().collect();
         v.sort_unstable_by(|a, b| b.1 .0.cmp(&a.1 .0));
 
         let data = format!(
@@ -124,7 +122,7 @@ impl<'a> Stats<'a> {
         );
 
         let s = v
-            .iter()
+            .into_iter()
             .map(|(key, val)| format!("{:<22} {:<22} {:.3}%\n", key, val.0, val.1))
             .collect::<String>();
 
@@ -137,7 +135,7 @@ impl<'a> Stats<'a> {
         let file = File::create(file_name + ".stats.csv")?;
         let mut file = BufWriter::new(file);
 
-        let mut v: Vec<(&Cow<str>, &(usize, f64))> = self.term_frequency.iter().collect();
+        let mut v: Vec<(&&'a str, &(usize, f64))> = self.term_frequency.iter().collect();
         v.sort_unstable_by(|a, b| b.1 .0.cmp(&a.1 .0));
 
         let data = format!(
@@ -157,10 +155,8 @@ impl<'a> Stats<'a> {
 
     fn write_json(&self, file_name: String) -> io::Result<()> {
         let file = File::create(file_name + ".stats.json")?;
-        let mut file = BufWriter::new(file);
-
-        let s = to_string(&self)?;
-        file.write_all(s.as_bytes())?;
+        let file = BufWriter::new(file);
+        to_writer(file, self)?;
         Ok(())
     }
 }

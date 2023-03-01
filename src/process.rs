@@ -17,14 +17,14 @@ pub fn file(
     lemma: &FxHashMap<String, String>,
     junk: &HashSet<String>,
 ) -> io::Result<Vec<String>> {
-    let mut words = find_words_in_file(&f.display().to_string()).unwrap_or(Vec::new());
+    let mut words = find_words_in_file(&f.to_string_lossy()).unwrap_or(Vec::new());
 
     if !ops.skip_lemmanization {
         words = lemmatization(&words, lemma).unwrap_or(Vec::new());
     }
     if !ops.skip_junk_words {
         words = exclude_junk(&words, junk).unwrap_or(Vec::new());
-    }
+    }  
     if words.is_empty() {
         warn!(
             "{}: is empty or could not be read",
