@@ -3,7 +3,12 @@
 Hapax is a Rust command-line interface (CLI) tool for finding the frequency of words in files. This tool provides a simple and efficient way to analyze the frequency of words in a given text file.
 Getting Started
 
-To get started with TFA, first, clone the repository and navigate to the root directory of the project. Then, run the following command to build the project:
+## Performance 
+The app processed approximately **6 million** words per second, while without logging, the app processed around **10 million** words per second. This indicates that logging has a significant impact on the app's performance, as expected. Furthermore, the app's performance is influenced by various factors, such as the input data size, system processing speed,logging settings, lemmatization, junk words, ouput type. Therefore, users can optimize the app's performance by adjusting these factors based on their specific requirements.
+The performance of the CLI app was evaluated on a Ryzen 4500U 6 core 4GHz processor.
+
+## To get started 
+first, clone the repository and navigate to the root directory of the project. Then, run the following command to build the project:
 
 ```sh
 
@@ -23,11 +28,12 @@ Commands:
   tf    provides term frequency TF
   tft   provides term frequency for all documents words comb
   
-  help  Print this message or the help of the given subcommand(s)
-  -o, --output <OUTPUT>  type of the output file: json/csv/text [default: json]
-  -p, --path <PATH>      path to the output folder [default: ./]
-  -j, --junk             allow junk words 
-  -l, --lemma            skip lemmanization 
+  Options:
+  -o, --output <OUTPUT>  type of the output file: [json|csv|txt] [default: json]
+  -p, --path <PATH>      path to the folder where result will be saved [default: ./]
+      --log <LOG>        log filter [info|warn|error] [default: info]
+  -j, --junk             if set skip junk words
+  -l, --lemma            if set skip lemmatization
   -h, --help             Print help
   -V, --version          Print version
 ```
