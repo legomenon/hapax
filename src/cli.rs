@@ -22,7 +22,7 @@ struct Cli {
     path: String,
     /// log filter [info|warn|error]
     #[clap(default_value = "info")]
-    #[arg(short, long)]
+    #[arg(long)]
     log: String,
     /// if set skip junk words
     #[arg(short, long)]
